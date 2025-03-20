@@ -18,6 +18,9 @@ extern int transaction_amount_max;
 extern int queuing_delay_constant;
 extern int percent_fast;
 extern int percent_high_cpu;
+extern int percent_fast_malicious;
+extern int percent_high_cpu_malicious;
+extern long long total_hashing_power_malicious;
 extern int propagation_delay_min;
 extern int propagation_delay_max;;
 extern long long simulation_time;
@@ -54,6 +57,9 @@ public:
   bool fast;
   bool high_cpu;
   bool currently_mining;
+  bool malicious;
+  bool ringmaster;
+  vector<Link> malicious_peers; // stores links to all its malicious peers in the attacker-only-overlay-netwrok
   vector<Link> peers; // stores links to all its peers
   shared_ptr<Block> genesis; // genesis block pointer
   set<shared_ptr<LeafNode>,CompareLeafNodePtr> leaves; // stores information about all leaf nodes of blockchain tree
@@ -64,6 +70,9 @@ public:
   long long blocks_received;
 
   Node();
+
+  // Function to compute the union of peers and malicious_peers
+  size_t get_union_of_peers_size(); 
 
   // creates a random transaction and broadcasts it to its peers
   void create_transaction();
@@ -95,6 +104,7 @@ class Network
 {
 public:
   vector<Node> nodes;
+  vector<int> malicious_node_ids; // indexes of subset of nodes which are only malicious
 
   Network();
 };

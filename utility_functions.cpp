@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <stack>
 #include <random>
+#include <filesystem>
+
 
 // return random number from uniform distribution
 int uniform_distribution(const int min, const int max)
@@ -55,8 +57,60 @@ vector<int> choose_neighbours(int n, int k, vector<int> excluded)
     return selected_nodes;
 }
 
+// return k node ids as vector randomly from given possible choices as the universe_set
+vector<int> choose_neighbours_values(vector<int> universe_set, int k, vector<int> excluded) {
+
+    int n = universe_set.size();
+    vector<int> selected_nodes;
+    selected_nodes.reserve(k);
+
+    // Incrementally choose nodes without repetition from uniform distribution
+    while (selected_nodes.size() < k) {
+        int candidate_idx = uniform_distribution(0, n - 1);
+        int candidate = universe_set[candidate_idx];
+        if (find(excluded.begin(), excluded.end(), candidate) == excluded.end() &&
+            find(selected_nodes.begin(), selected_nodes.end(), candidate) == selected_nodes.end()) {
+            selected_nodes.push_back(candidate);
+        }
+    }
+
+    return selected_nodes;
+}
+
 // checks if the given graph is connected using dfs
 bool check_connected(vector<vector<int>>& al)
+{   
+    int n = static_cast<int>(al.size());
+    if (n == 0) return true;
+
+    // initialize data structures
+    vector<bool> visited(n, false);
+    stack<int> s;
+    s.push(0);
+    visited[0] = true;
+    int visited_count = 1;
+
+    // dfs to determine all reachable nodes
+    while (!s.empty())
+    {
+        const int node = s.top();
+        s.pop();
+        for (int neighbor : al[node])
+        {
+            if (!visited[neighbor])
+            {
+                visited[neighbor] = true;
+                s.push(neighbor);
+                visited_count++;
+            }
+        }
+    }
+    // check if all nodes reachable
+    return visited_count == n;
+}
+
+// checks if the given graph is connected using dfs: ml is map 
+bool check_connected_map(map<int, vector<int>>& al)
 {   
     int n = static_cast<int>(al.size());
     if (n == 0) return true;
@@ -119,3 +173,97 @@ void write_network_to_file(vector<vector<int>> &al,const string &fname)
 
     file.close();
 }
+
+// Creates a file with name fname and write graphs nodes in it.
+void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
+{
+    // directory name to store file
+    fs::path dir = "Output/Temp_files/";
+
+    // Check if the directory exists, if not create it
+    if (!fs::exists(dir)) {
+        fs::create_directories(dir);
+    }
+
+    string filepath = "Output/Temp_files/" + fname;
+    ofstream file(filepath);
+    if(!file){
+        cerr << "An Error occurred while opening file!" << endl;
+        return;
+    }
+    
+    // Store adjacency list in the main file (edge list format)
+    for (const auto& [node, neighbors] : al) {
+        for (int neighbor : neighbors) {
+            if (node < neighbor) {  // Avoid duplicate edges (e.g., 0-8 and 8-0)
+                file << node << " " << neighbor << "\n";
+            }
+        }
+    }
+
+    file.close();
+
+
+    // Create the full filepath for the adjacency list file
+    fs::path path(filepath);
+    std::string base_filename = path.stem().string();  // Extract base filename without extension
+    std::string adj_list_filepath = dir.string() + base_filename + "_adj_list.txt";
+
+    // Open the adjacency list file for writing
+    std::ofstream adj_file(adj_list_filepath);
+    if (!adj_file) {
+        std::cerr << "An Error occurred while opening adjacency list file: " << adj_list_filepath << std::endl;
+        return;
+    }
+
+    // Store adjacency list in the specified format
+    for (const auto& [node, neighbors] : al) {
+        adj_file << "Node " << node << " : ";
+        for (int neighbor : neighbors) {
+            adj_file << neighbor << " ";
+        }
+        adj_file << "\n";
+    }
+    adj_file.close();
+
+}
+
+
+// Write node details.
+void write_node_details_to_file(vector<Node> nodes, const string &fname)
+{
+    // directory name to store file
+    fs::path dir = "Output/Temp_files/";
+
+    // Check if the directory exists, if not create it
+    if (!fs::exists(dir)) {
+        fs::create_directories(dir);
+    }
+
+    string filepath = "Output/Temp_files/" + fname;
+
+    ofstream file(filepath);
+
+    if(!file){
+        cerr << "An Error occurred while opening file!" << endl;
+        return;
+    }
+    
+    file << "node_id,malicious,ringmaster,fast,high_cpu,num_peers,num_malicious_peers,num_total_peers"<<endl;
+    for (Node n : nodes) {
+        // Compute the union of peers and malicious_peers
+        size_t union_peers_size = n.get_union_of_peers_size();
+
+        file << n.id << "," 
+             << n.malicious << "," 
+             << n.ringmaster << "," 
+             << n.fast << "," 
+             << n.high_cpu << "," 
+             << n.peers.size() << "," 
+             << n.malicious_peers.size() << "," 
+             << union_peers_size << std::endl;
+    }
+
+    file.close();
+}
+

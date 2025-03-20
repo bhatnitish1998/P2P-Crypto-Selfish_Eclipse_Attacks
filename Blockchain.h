@@ -9,6 +9,7 @@
 using namespace std;
 
 extern int number_of_nodes;
+extern int percent_malicious_nodes;
 
 class Transaction
 {
