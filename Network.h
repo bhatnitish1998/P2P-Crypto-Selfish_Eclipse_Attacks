@@ -48,7 +48,7 @@ public:
 
 class Node
 {
-private:
+protected:
   // to generate unique node ids (equal to index in node vector)
   static int node_ticket;
 
@@ -57,9 +57,6 @@ public:
   bool fast;
   bool high_cpu;
   bool currently_mining;
-  bool malicious;
-  bool ringmaster;
-  vector<Link> malicious_peers; // stores links to all its malicious peers in the attacker-only-overlay-netwrok
   vector<Link> peers; // stores links to all its peers
   shared_ptr<Block> genesis; // genesis block pointer
   set<shared_ptr<LeafNode>,CompareLeafNodePtr> leaves; // stores information about all leaf nodes of blockchain tree
@@ -70,9 +67,9 @@ public:
   long long blocks_received;
 
   Node();
-
+  virtual ~Node() {};
   // Function to compute the union of peers and malicious_peers
-  size_t get_union_of_peers_size(); 
+  virtual size_t get_union_of_peers_size(); 
 
   // creates a random transaction and broadcasts it to its peers
   void create_transaction();
@@ -100,13 +97,38 @@ public:
   void broadcast_block(const shared_ptr<Block>& blk);
 };
 
+
+
+// Malicious Node 
+class MaliciousNode : public Node {
+public:
+  vector<Link> malicious_peers; 
+  MaliciousNode();
+  size_t get_union_of_peers_size();
+};
+
+// Ringmaster
+class RingMasterNode : public MaliciousNode {
+public:
+  int global_chain_length;
+  int private_chain_length;
+  RingMasterNode();
+
+};
+
+
+
 class Network
 {
 public:
-  vector<Node> nodes;
+  vector<shared_ptr<Node>> nodes;
   vector<int> malicious_node_ids; // indexes of subset of nodes which are only malicious
+  vector<int> honest_node_ids;
+  int ringmaster_node_id;
 
   Network();
+  
+  void build_network(vector<int> &node_ids,string networkType); 
 };
 
 class Logger

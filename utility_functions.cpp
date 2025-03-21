@@ -230,40 +230,61 @@ void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
 
 
 // Write node details.
-void write_node_details_to_file(vector<Node> nodes, const string &fname)
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <memory>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+void write_node_details_to_file(const vector<shared_ptr<Node>>& nodes, const std::string &fname)
 {
-    // directory name to store file
+    // Directory for output
     fs::path dir = "Output/Temp_files/";
 
-    // Check if the directory exists, if not create it
+    // Create directory if it doesn't exist
     if (!fs::exists(dir)) {
         fs::create_directories(dir);
     }
 
-    string filepath = "Output/Temp_files/" + fname;
+    std::string filepath = "Output/Temp_files/" + fname;
+    std::ofstream file(filepath);
 
-    ofstream file(filepath);
-
-    if(!file){
-        cerr << "An Error occurred while opening file!" << endl;
+    if (!file) {
+        std::cerr << "An Error occurred while opening file!" << std::endl;
         return;
     }
-    
-    file << "node_id,malicious,ringmaster,fast,high_cpu,num_peers,num_malicious_peers,num_total_peers"<<endl;
-    for (Node n : nodes) {
-        // Compute the union of peers and malicious_peers
-        size_t union_peers_size = n.get_union_of_peers_size();
 
-        file << n.id << "," 
-             << n.malicious << "," 
-             << n.ringmaster << "," 
-             << n.fast << "," 
-             << n.high_cpu << "," 
-             << n.peers.size() << "," 
-             << n.malicious_peers.size() << "," 
+    // CSV Header
+    file << "node_id,malicious,ringmaster,fast,high_cpu,num_peers_in_common,num_peers_in_overlay,num_total_peers_in_both_nws" << std::endl;
+
+    for (const auto& node_ptr : nodes) {
+        if (!node_ptr) continue;  // Skip if null
+
+        // Compute total peers
+        size_t union_peers_size = node_ptr->get_union_of_peers_size();
+
+        // Check if the node is a MaliciousNode
+        auto* maliciousNode = dynamic_cast<MaliciousNode*>(node_ptr.get());
+        bool is_malicious = (maliciousNode != nullptr);
+        size_t num_malicious_peers = is_malicious ? maliciousNode->malicious_peers.size() : 0;
+
+        // Check if the node is a RingMasterNode
+        auto* ringMasterNode = dynamic_cast<RingMasterNode*>(node_ptr.get());
+        bool is_ringmaster = (ringMasterNode != nullptr);
+
+        file << node_ptr->id << "," 
+             << is_malicious << ","   // 1 if MaliciousNode, 0 otherwise
+             << is_ringmaster << ","  // 1 if RingMasterNode, 0 otherwise
+             << node_ptr->fast << "," 
+             << node_ptr->high_cpu << "," 
+             << node_ptr->peers.size() << "," 
+             << num_malicious_peers << "," 
              << union_peers_size << std::endl;
     }
 
     file.close();
 }
+
 

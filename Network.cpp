@@ -19,11 +19,6 @@ Node::Node()
     id = node_ticket++;
     fast = false;
     high_cpu = false;
-    malicious = false;
-    ringmaster = false;
-    if (malicious) {
-        malicious_peers.reserve(6);
-    }
     peers.reserve(6);
     genesis = nullptr;
     currently_mining = false;
@@ -31,8 +26,20 @@ Node::Node()
     blocks_received = 0;
 }
 
+MaliciousNode::MaliciousNode() : Node() {
+    malicious_peers.reserve(6);
+    fast = true;
+}
+
+RingMasterNode::RingMasterNode() : MaliciousNode() {
+}
+
 // Function to compute the size of union of peers and malicious_peers
 size_t Node::get_union_of_peers_size() {
+    return peers.size();
+}
+
+size_t MaliciousNode::get_union_of_peers_size() {
     std::set<int> union_set;
 
     // Add all peer indices from peers
@@ -45,7 +52,6 @@ size_t Node::get_union_of_peers_size() {
         union_set.insert(link.peer);
     }
 
-    // Return the size of the union set
     return union_set.size();
 }
 
@@ -323,120 +329,22 @@ void Node::broadcast_block(const shared_ptr<Block>& blk)
     }
 }
 
-
-Network::Network()
-{
-    // Node id equal to its index in vector
-    nodes.resize(number_of_nodes);
-
-    //   Make ( n * percent_fast) fast nodes
-    vector<int> fast_nodes = choose_percent(number_of_nodes, percent_fast / 100.0);
-    for (const int node_id : fast_nodes)
-        nodes[node_id].fast = true;
-
-    //   Make ( n * percent_high_cpu) high_cpu nodes
-    percent_high_cpu = 0;   // because all nodes have same hashing power
-    vector<int> high_cpu_nodes = choose_percent(number_of_nodes, percent_high_cpu / 100.0);
-    total_hashing_power += static_cast<long long>(high_cpu_nodes.size()) * 10 + \
-    (number_of_nodes- static_cast<long long>(high_cpu_nodes.size()));
-
-    for (const int node_id : high_cpu_nodes)
-        nodes[node_id].high_cpu = true;
-
-    bool done = false;
-    vector<vector<int>> al(number_of_nodes);
-
-    // Until graph is connected
-    while (!done)
-    {
-        al.clear();
-        al.resize(number_of_nodes);
-
-        for (int i = 0; i < number_of_nodes; i++)
-        {
-            int min_peers = min(3,number_of_nodes-1);
-            // until at least connected to min peers keep adding neighbors (reverse addition leads to > 3 but < 6 links)
-            while (al[i].size() < min_peers)
-            {
-                vector<int> temp = choose_neighbours(number_of_nodes, min_peers - static_cast<int>(al[i].size()), al[i]);
-                for (auto neighbour : temp)
-                {
-                    // ensure max 6 peers
-                    if (neighbour != i && al[neighbour].size() < min(6,number_of_nodes-1))
-                    {
-                        al[i].push_back(neighbour);
-                        al[neighbour].push_back(i);
-                    }
-                }
-            }
-        }
-        done = check_connected(al);
-
-        // store network to file if done
-        if(done) write_network_to_file(al,"network.txt");
-    }
-
-    // set up link speed and propagation delay for each peer
-    for (int i = 0; i < number_of_nodes; i++)
-    {
-        for (auto x : al[i])
-        {
-            if (i < x)
-            {
-                int propagation_delay = uniform_distribution(propagation_delay_min, propagation_delay_max);
-                int link_speed = nodes[i].fast && nodes[x].fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
-                nodes[i].peers.emplace_back(x, propagation_delay, link_speed);
-                nodes[x].peers.emplace_back(i, propagation_delay, link_speed);
-            }
-        }
-    }
-
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-    // setup similar network for malicious_nodes
-
-    // Node id equal to its index in vector
-    malicious_node_ids.resize(percent_malicious_nodes * number_of_nodes / 100.0);
-
-    // assign number_of_malicious_nodes nodes to be malicious from common network of honest nodes
-    malicious_node_ids = choose_percent(number_of_nodes, percent_malicious_nodes / 100.0);
-    for (int node_id : malicious_node_ids){
-        nodes[node_id].malicious = true;
-    }
-
-    nodes[malicious_node_ids[0]].ringmaster = true; // set first index node in malicious_node_ids to be the ringmaster
-
-    //   Make ( n * percent_fast) fast nodes
-    percent_fast_malicious = 100;   // all malicious nodes are fast
-    vector<int> fast_node_indices = choose_percent(malicious_node_ids.size(), percent_fast_malicious / 100.0);
-    for (const int idx : fast_node_indices)
-        nodes[malicious_node_ids[idx]].fast = true;
-
-    //   Make ( n * percent_high_cpu) high_cpu nodes
-    percent_high_cpu_malicious = 0; // because all nodes have same hashing power
-    vector<int> high_cpu_nodes_indices = choose_percent(malicious_node_ids.size(), percent_high_cpu_malicious / 100.0);
-    total_hashing_power_malicious += static_cast<long long>(high_cpu_nodes_indices.size()) * 10 + \
-    (malicious_node_ids.size() - high_cpu_nodes_indices.size());
-
-    for (const int idx : high_cpu_nodes_indices)
-        nodes[malicious_node_ids[idx]].high_cpu = true;
-
-    done = false;
+void Network::build_network(vector<int> &node_ids,string networkType){
+    int done = false;
     map<int, vector<int>> mal;  // Adjacency list as a map
 
-    for (int node_idx : malicious_node_ids) {
+    sort(node_ids.begin(), node_ids.end());
+
+    for (int node_idx : node_ids) {
         mal[node_idx] = {};
     }
 
-    sort(malicious_node_ids.begin(), malicious_node_ids.end());
 
     // Until graph is connected
     while (!done) {
-        for (int i = 0; i < malicious_node_ids.size(); i++) {
-            int node_idx = malicious_node_ids[i];
-            int min_peers = min(3, static_cast<int>(malicious_node_ids.size() - 1));
+        for (int i = 0; i < node_ids.size(); i++) {
+            int node_idx = node_ids[i];
+            int min_peers = min(3, static_cast<int>(node_ids.size() - 1));
 
             // Until at least connected to min peers, keep adding neighbors
             while (mal[node_idx].size() < min_peers) {
@@ -444,15 +352,15 @@ Network::Network()
                 // Create excluded list
                 vector<int> excluded;
                 excluded.push_back(node_idx);
-                for (int j = 0; j < malicious_node_ids.size(); j++) {
-                    if (find(mal[node_idx].begin(), mal[node_idx].end(), malicious_node_ids[j]) != mal[node_idx].end()) {
-                        excluded.push_back(malicious_node_ids[j]);
+                for (int j = 0; j < node_ids.size(); j++) {
+                    if (find(mal[node_idx].begin(), mal[node_idx].end(), node_ids[j]) != mal[node_idx].end()) {
+                        excluded.push_back(node_ids[j]);
                     }
                 }
 
                 // Choose new neighbors
                 vector<int> temp = choose_neighbours_values(
-                    malicious_node_ids,
+                    node_ids,
                     min_peers - static_cast<int>(mal[node_idx].size()),
                     excluded
                 );
@@ -463,7 +371,7 @@ Network::Network()
 
                     // Ensure max 6 peers, no self-connection, and no duplicate edges
                     if (nei_idx != node_idx &&
-                        mal[nei_idx].size() < min(6, static_cast<int>(malicious_node_ids.size() - 1)) &&
+                        mal[nei_idx].size() < min(6, static_cast<int>(node_ids.size() - 1)) &&
                         find(mal[node_idx].begin(), mal[node_idx].end(), nei_idx) == mal[node_idx].end()) {
                         mal[node_idx].push_back(nei_idx);
                         mal[nei_idx].push_back(node_idx);
@@ -477,27 +385,147 @@ Network::Network()
         
         // Store network to file if done
         if (done) {
-            write_network_to_file_map(mal, "network_malicious.txt");
+            string fname = "network_" + networkType + ".txt";
+            write_network_to_file_map(mal, fname);
         }
         
     }
 
     // set up link speed and propagation delay for each peer
-    for (int i: malicious_node_ids)
+    for (int i: node_ids)
     {
         for (auto x : mal[i])
         {
             if (i < x)
             {
                 int propagation_delay = uniform_distribution(propagation_delay_min, propagation_delay_max); // 1ms to 10ms
-                int link_speed = nodes[i].fast && nodes[x].fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
-                nodes[i].malicious_peers.emplace_back(x, propagation_delay, link_speed);
-                nodes[x].malicious_peers.emplace_back(i, propagation_delay, link_speed);
+                int link_speed = nodes[i]->fast && nodes[x]->fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
+                
+                if (networkType == "common"){
+                    nodes[i]->peers.emplace_back(x, propagation_delay, link_speed);
+                    nodes[x]->peers.emplace_back(i, propagation_delay, link_speed);
+                }
+                else{
+                    MaliciousNode* maliciousNodeI = dynamic_cast<MaliciousNode*>(nodes[i].get());
+                    MaliciousNode* maliciousNodeX = dynamic_cast<MaliciousNode*>(nodes[x].get());
+                    maliciousNodeI->malicious_peers.emplace_back(x, propagation_delay, link_speed);
+                    maliciousNodeX->malicious_peers.emplace_back(i, propagation_delay, link_speed);
+                }
             }
         }
     }
 
-    write_node_details_to_file(nodes, "node_details.csv");
+    
+
+}
+
+
+Network::Network()
+{
+    // Node id equal to its index in vector
+    nodes.resize(number_of_nodes);
+    vector<int> all_node_ids;
+    for (int i=0; i<number_of_nodes; i++){
+        all_node_ids.push_back(i);
+    }
+
+    //   Make ( n * percent_fast) fast nodes
+    malicious_node_ids = choose_percent(number_of_nodes, percent_malicious_nodes / 100.0);
+    bool assigned_ringmaster = false;
+    for(int i=0; i<number_of_nodes; i++){
+        if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){
+            if (assigned_ringmaster) 
+                nodes[i] = make_shared<MaliciousNode>();
+            else{
+                nodes[i] = make_shared<RingMasterNode>();
+                assigned_ringmaster = true;
+                ringmaster_node_id = nodes[i]->id;
+                cout<<"Ringmaster id: " << ringmaster_node_id;
+            }
+        }
+        else{
+            honest_node_ids.push_back(i);
+            nodes[i] = make_shared<Node>();   // honest_node created
+        }
+    }
+
+    cout<< "Malicious node ids: ";
+    for(int i: malicious_node_ids){
+        cout<< " "<< i; 
+    }
+
+
+    cout<< "\nHonest node ids: ";
+    for(int i: honest_node_ids){
+        cout<< " "<< i; 
+    }
+
+    total_hashing_power = number_of_nodes; // all nodes have same hashing power; consider unit of hashing power per node = 1.
+    total_hashing_power_malicious = malicious_node_ids.size() * 1;
+
+    build_network(all_node_ids, "common");
+    build_network(malicious_node_ids, "malicious");
+
+
+    write_node_details_to_file(nodes, "all_node_details.csv");
+
+    // bool done = false;
+    // vector<vector<int>> al(number_of_nodes);
+
+    // // Until graph is connected
+    // while (!done)
+    // {
+    //     al.clear();
+    //     al.resize(number_of_nodes);
+
+    //     for (int i = 0; i < number_of_nodes; i++)
+    //     {
+    //         int min_peers = min(3,number_of_nodes-1);
+    //         // until at least connected to min peers keep adding neighbors (reverse addition leads to > 3 but < 6 links)
+    //         while (al[i].size() < min_peers)
+    //         {
+    //             vector<int> temp = choose_neighbours_values(honest_node_ids, min_peers - static_cast<int>(al[i].size()), al[i]);
+    //             for (auto neighbour : temp)
+    //             {
+    //                 // ensure max 6 peers
+    //                 if (neighbour != i && al[neighbour].size() < min(6,number_of_nodes-1))
+    //                 {
+    //                     al[i].push_back(neighbour);
+    //                     al[neighbour].push_back(i);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     done = check_connected(al);
+
+    //     // store network to file if done
+    //     if(done) write_network_to_file(al,"network.txt");
+    // }
+
+    // // set up link speed and propagation delay for each peer
+    // for (int i = 0; i < number_of_nodes; i++)
+    // {
+    //     for (auto x : al[i])
+    //     {
+    //         if (i < x)
+    //         {
+    //             int propagation_delay = uniform_distribution(propagation_delay_min, propagation_delay_max);
+    //             int link_speed = nodes[i]->fast && nodes[x]->fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
+    //             nodes[i]->peers.emplace_back(x, propagation_delay, link_speed);
+    //             nodes[x]->peers.emplace_back(i, propagation_delay, link_speed);
+    //         }
+    //     }
+    // }
+
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    // setup similar network for malicious_nodes
+
+    
+
 
 }
 
