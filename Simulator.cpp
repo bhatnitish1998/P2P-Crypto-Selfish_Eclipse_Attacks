@@ -18,8 +18,8 @@ void Simulator::create_genesis()
     // add genesis block to all nodes
     for (int i = 0; i < number_of_nodes; i++)
     {
-        network.nodes[i].genesis = genesis;
-        network.nodes[i].block_ids_in_tree.insert({genesis->id, simulation_time});
+        network.nodes[i]->genesis = genesis;
+        network.nodes[i]->block_ids_in_tree.insert({genesis->id, simulation_time});
 
         // update leaves in each node with initial balance, transaction ids and balance of each node
         auto temp = make_shared<LeafNode>(genesis, 1);
@@ -36,7 +36,7 @@ void Simulator::create_genesis()
                 temp->balance[txn->receiver] += txn->amount;
             }
         }
-        network.nodes[i].leaves.insert(temp);
+        network.nodes[i]->leaves.insert(temp);
     }
     cout << " Added genesis block to all nodes" << endl;
 }
@@ -83,24 +83,24 @@ void Simulator::start()
         if (e.type == CREATE_TRANSACTION)
         {
             const auto obj = std::get<struct create_transaction_object>(e.object);
-            network.nodes[obj.creator_node_id].create_transaction();
+            network.nodes[obj.creator_node_id]->create_transaction();
         }
 
         if (e.type == RECEIVE_TRANSACTION)
         {
             auto obj = std::get<struct receive_transaction_object>(e.object);
-            network.nodes[obj.receiver_node_id].receive_transaction(obj);
+            network.nodes[obj.receiver_node_id]->receive_transaction(obj);
         }
         if (e.type == RECEIVE_BLOCK)
         {
             const auto obj = std::get<struct receive_block_object>(e.object);
-            network.nodes[obj.receiver_node_id].receive_block(obj);
+            network.nodes[obj.receiver_node_id]->receive_block(obj);
         }
 
         if (e.type == BLOCK_MINED)
         {
             const auto obj = std::get<struct block_mined_object>(e.object);
-            network.nodes[obj.miner_node_id].complete_mining(obj.blk);
+            network.nodes[obj.miner_node_id]->complete_mining(obj.blk);
         }
     }
     cout << " Simulation completed, Writing stats to files" << endl;
@@ -130,17 +130,17 @@ void Simulator::write_node_stats_to_file()
             return;
         }
 
-        file << "Node ID: " << network.nodes[i].id << endl;
-        file << "Fast node: " << network.nodes[i].fast << endl;
-        file << "High_cpu: " << network.nodes[i].high_cpu << endl;
+        file << "Node ID: " << network.nodes[i]->id << endl;
+        file << "Fast node: " << network.nodes[i]->fast << endl;
+        file << "High_cpu: " << network.nodes[i]->high_cpu << endl;
         file << "Peers:" << endl;
-        for (auto& peer : network.nodes[i].peers)
+        for (auto& peer : network.nodes[i]->peers)
         {
             file << "\t Node id: " << peer.peer << " Propagation delay: " << peer.propagation_delay << " ms"
                 << " Link speed: " << peer.link_speed << endl;
         }
-        file << "Transactions received: " << network.nodes[i].transactions_received << endl;
-        file << "Blocks received: " << network.nodes[i].blocks_received << endl;
+        file << "Transactions received: " << network.nodes[i]->transactions_received << endl;
+        file << "Blocks received: " << network.nodes[i]->blocks_received << endl;
 
         long long blocks_created = 0;
         long long blocks_in_longest_chain = 0;
@@ -149,7 +149,7 @@ void Simulator::write_node_stats_to_file()
         set<long long> block_ids; // set to keep track of already inserted blocks
 
 
-        long long longest = (*network.nodes[i].leaves.begin())->block->id;
+        long long longest = (*network.nodes[i]->leaves.begin())->block->id;
 
         // variables for counting fork statistics
         vector<long long> fork_lengths;
@@ -157,7 +157,7 @@ void Simulator::write_node_stats_to_file()
         set< long long> block_ids_in_longest;
 
         // traverse other chains and get block stats
-        for (const auto& leaf : network.nodes[i].leaves)
+        for (const auto& leaf : network.nodes[i]->leaves)
         {
             bool longest_flag = false;
             if (leaf->block->id == longest)
@@ -188,7 +188,7 @@ void Simulator::write_node_stats_to_file()
                     b.parent_block_id = temp_block->parent_block->id;
                 else
                     b.parent_block_id = -1;
-                b.first_seen_time = network.nodes[i].block_ids_in_tree[temp_block->id];
+                b.first_seen_time = network.nodes[i]->block_ids_in_tree[temp_block->id];
                 b.num_transactions = static_cast<long long>(temp_block->transactions.size());
                 block_ids.insert(b.block_id);
 
@@ -204,7 +204,7 @@ void Simulator::write_node_stats_to_file()
                     b.part_of_longest = false;
                 }
 
-                if (temp_block->transactions[0]->receiver == i && temp_block != network.nodes[i].genesis)
+                if (temp_block->transactions[0]->receiver == i && temp_block != network.nodes[i]->genesis)
                 {
                     b.generated_by_node = true;
                     blocks_created++;

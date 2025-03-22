@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <stack>
 #include <random>
+#include <filesystem>
+
+
 
 // return random number from uniform distribution
 int uniform_distribution(const int min, const int max)
@@ -55,6 +58,26 @@ vector<int> choose_neighbours(int n, int k, vector<int> excluded)
     return selected_nodes;
 }
 
+// return k node ids as vector randomly from given possible choices as the universe_set
+vector<int> choose_neighbours_values(vector<int> universe_set, int k, vector<int> excluded) {
+
+    int n = universe_set.size();
+    vector<int> selected_nodes;
+    selected_nodes.reserve(k);
+
+    // incrementally choose nodes without repetition from uniform distribution
+    while (selected_nodes.size() < k) {
+        int candidate_idx = uniform_distribution(0, n - 1);
+        int candidate = universe_set[candidate_idx];
+        if (find(excluded.begin(), excluded.end(), candidate) == excluded.end() &&
+            find(selected_nodes.begin(), selected_nodes.end(), candidate) == selected_nodes.end()) {
+            selected_nodes.push_back(candidate);
+        }
+    }
+
+    return selected_nodes;
+}
+
 // checks if the given graph is connected using dfs
 bool check_connected(vector<vector<int>>& al)
 {   
@@ -87,6 +110,49 @@ bool check_connected(vector<vector<int>>& al)
     return visited_count == n;
 }
 
+// checks if the given graph is connected using dfs: ml is map
+bool check_connected_map(map<int, vector<int>>& al) {
+    static int cnt = 0;
+    cnt++;
+    cout << "Check connected map called " << cnt << " times" << endl;
+
+    int n = static_cast<int>(al.size());
+    if (n == 0) return true;
+
+    // create a mapping from node ids to contiguous indices
+    map<int, int> node_to_index;
+    int index = 0;
+    for (const auto& [node, _] : al) {
+        node_to_index[node] = index++;
+    }
+
+    vector<bool> visited(n, false);
+    stack<int> s;
+
+    // start dfs from the first node in the map
+    int start_node = al.begin()->first;
+    s.push(start_node);
+    visited[node_to_index[start_node]] = true;
+    int visited_count = 1;
+
+    // dfs to determine all reachable nodes
+    while (!s.empty()) {
+        const int node = s.top();
+        s.pop();
+        for (int neighbor : al[node]) {
+            int neighbor_index = node_to_index[neighbor];
+            if (!visited[neighbor_index]) {
+                visited[neighbor_index] = true;
+                s.push(neighbor);
+                visited_count++;
+            }
+        }
+    }
+
+    // check if all nodes are reachable
+    return visited_count == n;
+}
+
 
 // Creates a file with name fname and write graphs nodes in it.
 void write_network_to_file(vector<vector<int>> &al,const string &fname)
@@ -108,7 +174,7 @@ void write_network_to_file(vector<vector<int>> &al,const string &fname)
         return;
     }
     
-    // Store adjacency list in file
+    // store adjacency list in file
      for (size_t node = 0; node < al.size(); node++) {
         for (int neighbor : al[node]) {
             if (node < neighbor) {
@@ -119,3 +185,111 @@ void write_network_to_file(vector<vector<int>> &al,const string &fname)
 
     file.close();
 }
+
+// creates a file with name fname and write graphs nodes in it.
+void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
+{
+    // directory name to store file
+    fs::path dir = "Output/Temp_files/";
+
+    if (!fs::exists(dir)) {
+        fs::create_directories(dir);
+    }
+
+    string filepath = "Output/Temp_files/" + fname;
+    ofstream file(filepath);
+    if(!file){
+        cerr << "An Error occurred while opening file!" << endl;
+        return;
+    }
+
+    // store adjacency list in the main file (edge list format)
+    for (const auto& [node, neighbors] : al) {
+        for (int neighbor : neighbors) {
+            if (node < neighbor) {  // avoid duplicate edges (e.g., 0-8 and 8-0)
+                file << node << " " << neighbor << "\n";
+            }
+        }
+    }
+
+    file.close();
+
+    fs::path path(filepath);
+    std::string base_filename = path.stem().string();
+    std::string adj_list_filepath = dir.string() + base_filename + "_adj_list.txt";
+
+    std::ofstream adj_file(adj_list_filepath);
+    if (!adj_file) {
+        std::cerr << "An Error occurred while opening adjacency list file: " << adj_list_filepath << std::endl;
+        return;
+    }
+
+    // Store adjacency list in the [node x: neighbours] format
+    for (const auto& [node, neighbors] : al) {
+        adj_file << "Node " << node << " : ";
+        for (int neighbor : neighbors) {
+            adj_file << neighbor << " ";
+        }
+        adj_file << "\n";
+    }
+    adj_file.close();
+
+}
+
+
+// Write node details.
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <memory>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
+void write_node_details_to_file(const vector<shared_ptr<Node>>& nodes, const std::string &fname)
+{
+    fs::path dir = "Output/Temp_files/";
+
+    if (!fs::exists(dir)) {
+        fs::create_directories(dir);
+    }
+
+    std::string filepath = "Output/Temp_files/" + fname;
+    std::ofstream file(filepath);
+
+    if (!file) {
+        std::cerr << "An Error occurred while opening file!" << std::endl;
+        return;
+    }
+
+    // CSV Header
+    file << "node_id,malicious,ringmaster,fast,hashing_power,hashing_fraction,num_peers_in_common,num_peers_in_overlay,num_total_peers_in_both_nws" << std::endl;
+
+    for (const auto& node_ptr : nodes) {
+        if (!node_ptr) continue;
+
+        // Compute total peers : union(peers_in_common_nw, peers_in_overlay_nw)
+        size_t union_peers_size = node_ptr->get_union_of_peers_size();
+
+        auto* maliciousNode = dynamic_cast<MaliciousNode*>(node_ptr.get());
+        bool is_malicious = (maliciousNode != nullptr);
+        size_t num_malicious_peers = is_malicious ? maliciousNode->malicious_peers.size() : 0;
+
+        auto* ringMasterNode = dynamic_cast<RingMasterNode*>(node_ptr.get());
+        bool is_ringmaster = (ringMasterNode != nullptr);
+
+        file << node_ptr->id << ","
+             << is_malicious << ","   // 1 if MaliciousNode, 0 otherwise
+             << is_ringmaster << ","  // 1 if RingMasterNode, 0 otherwise
+             << node_ptr->fast << ","
+             << node_ptr->hashing_power << ","
+             << node_ptr->hashing_power / total_hashing_power << ","
+             << node_ptr->peers.size() << ","
+             << num_malicious_peers << ","
+             << union_peers_size << std::endl;
+    }
+
+    file.close();
+}
+
+

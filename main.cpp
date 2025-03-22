@@ -13,6 +13,8 @@ int initial_bitcoin = 1000;
 int initial_number_of_transactions = 5000;
 int propagation_delay_min = 10;
 int propagation_delay_max = 500;
+int propagation_delay_malicious_min = 1;
+int propagation_delay_malicious_max = 10;
 int transaction_amount_min = 5;
 int transaction_amount_max = 20;
 int queuing_delay_constant = 96;  // 96000 per second
@@ -23,6 +25,7 @@ int mining_reward = 50;
 int number_of_nodes;
 int percent_fast;
 int percent_high_cpu;
+int percent_malicious_nodes;
 int mean_transaction_inter_arrival_time;
 int block_inter_arrival_time;
 
@@ -51,6 +54,8 @@ int main(int argc, char* argv[])
     percent_high_cpu = stoi(argv[3]);
     mean_transaction_inter_arrival_time = stoi(argv[4]);
     block_inter_arrival_time = stoi(argv[5])* 1000 ;
+    percent_malicious_nodes = 50;
+
 
     if (number_of_nodes < 1 || percent_fast < 0 || percent_fast > 100 || percent_high_cpu < 0 || percent_high_cpu > 100
         || mean_transaction_inter_arrival_time <= 0 || block_inter_arrival_time <= 0)
