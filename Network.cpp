@@ -344,6 +344,7 @@ void Network::build_network(vector<int> &node_ids,string networkType){
 
     // Until graph is connected
     while (!done) {
+        mal.clear();
         for (int i = 0; i < node_ids.size(); i++) {
             int node_idx = node_ids[i];
             int min_peers = min(3, static_cast<int>(node_ids.size() - 1));
@@ -416,6 +417,7 @@ void Network::build_network(vector<int> &node_ids,string networkType){
             }
         }
     }
+    cout<<"Network built for "<<networkType<<endl;
 
 }
 
@@ -436,7 +438,7 @@ Network::Network()
         if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){
             if (assigned_ringmaster){ 
                 nodes[i] = make_shared<MaliciousNode>();
-                nodes[i]->hashing_power = 0;
+                nodes[i]->hashing_power = 1;
             }
             else{
                 nodes[i] = make_shared<RingMasterNode>();

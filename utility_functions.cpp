@@ -110,34 +110,46 @@ bool check_connected(vector<vector<int>>& al)
 }
 
 // checks if the given graph is connected using dfs: ml is map 
-bool check_connected_map(map<int, vector<int>>& al)
-{   
+bool check_connected_map(map<int, vector<int>>& al) {
+    static int cnt = 0;
+    cnt++;
+    cout << "Check connected map called " << cnt << " times" << endl;
+
     int n = static_cast<int>(al.size());
     if (n == 0) return true;
 
-    // initialize data structures
+    // Create a mapping from node IDs to contiguous indices
+    map<int, int> node_to_index;
+    int index = 0;
+    for (const auto& [node, _] : al) {
+        node_to_index[node] = index++;
+    }
+
+    // Initialize data structures
     vector<bool> visited(n, false);
     stack<int> s;
-    s.push(0);
-    visited[0] = true;
+
+    // Start DFS from the first node in the map
+    int start_node = al.begin()->first;
+    s.push(start_node);
+    visited[node_to_index[start_node]] = true;
     int visited_count = 1;
 
-    // dfs to determine all reachable nodes
-    while (!s.empty())
-    {
+    // DFS to determine all reachable nodes
+    while (!s.empty()) {
         const int node = s.top();
         s.pop();
-        for (int neighbor : al[node])
-        {
-            if (!visited[neighbor])
-            {
-                visited[neighbor] = true;
+        for (int neighbor : al[node]) {
+            int neighbor_index = node_to_index[neighbor];
+            if (!visited[neighbor_index]) {
+                visited[neighbor_index] = true;
                 s.push(neighbor);
                 visited_count++;
             }
         }
     }
-    // check if all nodes reachable
+
+    // Check if all nodes are reachable
     return visited_count == n;
 }
 
