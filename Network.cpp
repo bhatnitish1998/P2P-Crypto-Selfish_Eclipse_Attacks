@@ -333,26 +333,24 @@ void Node::broadcast_block(const shared_ptr<Block>& blk)
 
 void Network::build_network(vector<int> &node_ids,string networkType){
     int done = false;
-    map<int, vector<int>> mal;  // Adjacency list as a map
-
-    // sort(node_ids.begin(), node_ids.end());
+    map<int, vector<int>> mal;  // adjacency list as a map
 
     for (int node_idx : node_ids) {
         mal[node_idx] = {};
     }
 
 
-    // Until graph is connected
+    // until graph is connected
     while (!done) {
         mal.clear();
         for (int i = 0; i < node_ids.size(); i++) {
             int node_idx = node_ids[i];
             int min_peers = min(3, static_cast<int>(node_ids.size() - 1));
 
-            // Until at least connected to min peers, keep adding neighbors
+            // until at least connected to min peers, keep adding neighbors
             while (mal[node_idx].size() < min_peers) {
 
-                // Create excluded list
+                // create excluded list for possible neighbours
                 vector<int> excluded;
                 excluded.push_back(node_idx);
                 for (int j = 0; j < node_ids.size(); j++) {
@@ -361,7 +359,7 @@ void Network::build_network(vector<int> &node_ids,string networkType){
                     }
                 }
 
-                // Choose new neighbors
+                // choose new neighbors
                 vector<int> temp = choose_neighbours_values(
                     node_ids,
                     min_peers - static_cast<int>(mal[node_idx].size()),
@@ -372,7 +370,7 @@ void Network::build_network(vector<int> &node_ids,string networkType){
                 for (auto neighbour : temp) {
                     int nei_idx = neighbour;
 
-                    // Ensure max 6 peers, no self-connection, and no duplicate edges
+                    // ensure max 6 peers, no self-connection, and no duplicate edges
                     if (nei_idx != node_idx &&
                         mal[nei_idx].size() < min(6, static_cast<int>(node_ids.size() - 1)) &&
                         find(mal[node_idx].begin(), mal[node_idx].end(), nei_idx) == mal[node_idx].end()) {
@@ -384,9 +382,8 @@ void Network::build_network(vector<int> &node_ids,string networkType){
             }
         }
         
-        done = check_connected_map(mal);  // Check if the graph is connected
+        done = check_connected_map(mal);  // check if the graph is connected
         
-        // Store network to file if done
         if (done) {
             string fname = "network_" + networkType + ".txt";
             write_network_to_file_map(mal, fname);
@@ -438,7 +435,7 @@ Network::Network()
         if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){
             if (assigned_ringmaster){ 
                 nodes[i] = make_shared<MaliciousNode>();
-                nodes[i]->hashing_power = 1;
+                nodes[i]->hashing_power = 0;
             }
             else{
                 nodes[i] = make_shared<RingMasterNode>();
