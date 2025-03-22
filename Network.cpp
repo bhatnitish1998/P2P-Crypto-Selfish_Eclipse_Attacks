@@ -19,6 +19,7 @@ Node::Node()
     id = node_ticket++;
     fast = false;
     high_cpu = false;
+    hashing_power = 1;  // (default) low: 1, high: 10 ; in assingment 2: all honest are low, all malicious except ringmaster have 0 hashing_power, ringmaster has num_malicious_nodes * low_hashing_power
     peers.reserve(6);
     genesis = nullptr;
     currently_mining = false;
@@ -232,7 +233,7 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
 void Node::mine_block()
 {
     currently_mining = true;
-    if (mempool.empty())
+    if (mempool.empty() || hashing_power <= 0)
     {
         currently_mining = false;
         return;
@@ -272,7 +273,8 @@ void Node::mine_block()
 
     l.log << "Time " << simulation_time << ": Node " << id << " started mining "<<blk->id<<endl;
     // compute mining time and create event at that time
-    const double hashing_fraction = (high_cpu? 10.0 : 1.0)/static_cast<double>(total_hashing_power);
+    // const double hashing_fraction = (high_cpu? 10.0 : 1.0)/static_cast<double>(total_hashing_power);
+    const double hashing_fraction = hashing_power / static_cast<double>(total_hashing_power);
     const long long mining_time = exponential_distribution(block_inter_arrival_time/hashing_fraction);
     block_mined_object obj(id,blk);
     event_queue.emplace(simulation_time + mining_time,BLOCK_MINED, obj);
@@ -333,7 +335,7 @@ void Network::build_network(vector<int> &node_ids,string networkType){
     int done = false;
     map<int, vector<int>> mal;  // Adjacency list as a map
 
-    sort(node_ids.begin(), node_ids.end());
+    // sort(node_ids.begin(), node_ids.end());
 
     for (int node_idx : node_ids) {
         mal[node_idx] = {};
@@ -415,8 +417,6 @@ void Network::build_network(vector<int> &node_ids,string networkType){
         }
     }
 
-    
-
 }
 
 
@@ -429,24 +429,29 @@ Network::Network()
         all_node_ids.push_back(i);
     }
 
-    //   Make ( n * percent_fast) fast nodes
+    //   create honest and malicious nodes ids and their nodes_ptr instances
     malicious_node_ids = choose_percent(number_of_nodes, percent_malicious_nodes / 100.0);
     bool assigned_ringmaster = false;
     for(int i=0; i<number_of_nodes; i++){
         if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){
-            if (assigned_ringmaster) 
+            if (assigned_ringmaster){ 
                 nodes[i] = make_shared<MaliciousNode>();
+                nodes[i]->hashing_power = 0;
+            }
             else{
                 nodes[i] = make_shared<RingMasterNode>();
+                nodes[i]->hashing_power = (double) malicious_node_ids.size();
                 assigned_ringmaster = true;
-                ringmaster_node_id = nodes[i]->id;
-                cout<<"Ringmaster id: " << ringmaster_node_id;
+                cout<<"Ringmaster id: " << nodes[i]->id<<endl;
             }
         }
         else{
             honest_node_ids.push_back(i);
-            nodes[i] = make_shared<Node>();   // honest_node created
+            nodes[i] = make_shared<Node>(); 
+            nodes[i]->hashing_power = 1;
         }
+
+        total_hashing_power += nodes[i]->hashing_power;
     }
 
     cout<< "Malicious node ids: ";
@@ -459,73 +464,17 @@ Network::Network()
     for(int i: honest_node_ids){
         cout<< " "<< i; 
     }
+    cout<<endl;
 
-    total_hashing_power = number_of_nodes; // all nodes have same hashing power; consider unit of hashing power per node = 1.
-    total_hashing_power_malicious = malicious_node_ids.size() * 1;
-
+    // total_hashing_power = number_of_nodes * 1; // all nodes have same hashing power; consider unit of hashing power per node = 1.
+    cout<< "total_hashing_power : " << total_hashing_power<<endl;
+    
     build_network(all_node_ids, "common");
     build_network(malicious_node_ids, "malicious");
 
-
     write_node_details_to_file(nodes, "all_node_details.csv");
-
-    // bool done = false;
-    // vector<vector<int>> al(number_of_nodes);
-
-    // // Until graph is connected
-    // while (!done)
-    // {
-    //     al.clear();
-    //     al.resize(number_of_nodes);
-
-    //     for (int i = 0; i < number_of_nodes; i++)
-    //     {
-    //         int min_peers = min(3,number_of_nodes-1);
-    //         // until at least connected to min peers keep adding neighbors (reverse addition leads to > 3 but < 6 links)
-    //         while (al[i].size() < min_peers)
-    //         {
-    //             vector<int> temp = choose_neighbours_values(honest_node_ids, min_peers - static_cast<int>(al[i].size()), al[i]);
-    //             for (auto neighbour : temp)
-    //             {
-    //                 // ensure max 6 peers
-    //                 if (neighbour != i && al[neighbour].size() < min(6,number_of_nodes-1))
-    //                 {
-    //                     al[i].push_back(neighbour);
-    //                     al[neighbour].push_back(i);
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     done = check_connected(al);
-
-    //     // store network to file if done
-    //     if(done) write_network_to_file(al,"network.txt");
-    // }
-
-    // // set up link speed and propagation delay for each peer
-    // for (int i = 0; i < number_of_nodes; i++)
-    // {
-    //     for (auto x : al[i])
-    //     {
-    //         if (i < x)
-    //         {
-    //             int propagation_delay = uniform_distribution(propagation_delay_min, propagation_delay_max);
-    //             int link_speed = nodes[i]->fast && nodes[x]->fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
-    //             nodes[i]->peers.emplace_back(x, propagation_delay, link_speed);
-    //             nodes[x]->peers.emplace_back(i, propagation_delay, link_speed);
-    //         }
-    //     }
-    // }
-
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-    // setup similar network for malicious_nodes
-
     
-
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 }
 

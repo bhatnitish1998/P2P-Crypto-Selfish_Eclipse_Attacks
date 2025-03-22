@@ -18,13 +18,10 @@ extern int transaction_amount_max;
 extern int queuing_delay_constant;
 extern int percent_fast;
 extern int percent_high_cpu;
-extern int percent_fast_malicious;
-extern int percent_high_cpu_malicious;
-extern long long total_hashing_power_malicious;
 extern int propagation_delay_min;
 extern int propagation_delay_max;;
 extern long long simulation_time;
-extern long long total_hashing_power;
+extern double total_hashing_power;
 extern int block_inter_arrival_time;
 extern int transaction_size;
 extern int mining_reward;
@@ -56,6 +53,7 @@ public:
   int id;
   bool fast;
   bool high_cpu;
+  double hashing_power;
   bool currently_mining;
   vector<Link> peers; // stores links to all its peers
   shared_ptr<Block> genesis; // genesis block pointer

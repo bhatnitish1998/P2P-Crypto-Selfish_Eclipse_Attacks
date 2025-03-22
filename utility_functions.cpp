@@ -257,12 +257,12 @@ void write_node_details_to_file(const vector<shared_ptr<Node>>& nodes, const std
     }
 
     // CSV Header
-    file << "node_id,malicious,ringmaster,fast,high_cpu,num_peers_in_common,num_peers_in_overlay,num_total_peers_in_both_nws" << std::endl;
+    file << "node_id,malicious,ringmaster,fast,hashing_power,hashing_fraction,num_peers_in_common,num_peers_in_overlay,num_total_peers_in_both_nws" << std::endl;
 
     for (const auto& node_ptr : nodes) {
         if (!node_ptr) continue;  // Skip if null
 
-        // Compute total peers
+        // Compute total peers : union(peers_in_common_nw, peers_in_overlay_nw)
         size_t union_peers_size = node_ptr->get_union_of_peers_size();
 
         // Check if the node is a MaliciousNode
@@ -278,7 +278,8 @@ void write_node_details_to_file(const vector<shared_ptr<Node>>& nodes, const std
              << is_malicious << ","   // 1 if MaliciousNode, 0 otherwise
              << is_ringmaster << ","  // 1 if RingMasterNode, 0 otherwise
              << node_ptr->fast << "," 
-             << node_ptr->high_cpu << "," 
+             << node_ptr->hashing_power << "," 
+             << node_ptr->hashing_power / total_hashing_power << "," 
              << node_ptr->peers.size() << "," 
              << num_malicious_peers << "," 
              << union_peers_size << std::endl;

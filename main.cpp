@@ -24,15 +24,12 @@ int number_of_nodes;
 int percent_fast;
 int percent_high_cpu;
 int percent_malicious_nodes;
-int percent_fast_malicious;
-int percent_high_cpu_malicious;
 int mean_transaction_inter_arrival_time;
 int block_inter_arrival_time;
 
 // Simulation variables
 long long simulation_time = 0;
-long long total_hashing_power = 0;
-long long total_hashing_power_malicious = 0;
+double total_hashing_power = 0;
 EQ event_queue;
 unsigned int global_seed = 911;
 Logger l;
