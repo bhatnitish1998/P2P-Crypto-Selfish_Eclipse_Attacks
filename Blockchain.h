@@ -5,6 +5,7 @@
 #include <ostream>
 #include <set>
 #include <memory>
+#include <queue>
 
 using namespace std;
 
@@ -54,6 +55,15 @@ public:
     LeafNode(shared_ptr<Block> block, long long length);
     friend ostream& operator<<(ostream& os, const LeafNode& leaf);
 
+};
+
+class Timer {
+    public:
+    shared_ptr<Block> blk;
+    queue<int> available_senders;
+    set<int> tried_senders;
+
+    Timer(shared_ptr<Block> blk);
 };
 
 // comparator to sort  LeafNode pointers by length of leaf node

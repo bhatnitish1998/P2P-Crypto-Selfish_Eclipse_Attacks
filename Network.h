@@ -9,6 +9,12 @@
 #include "Event.h"
 #include <filesystem>
 #include <fstream>
+#include <algorithm>
+#include <iostream>
+#include "utility_functions.h"
+
+
+typedef variant<shared_ptr<Transaction>, shared_ptr<Block>> MO;
 
 using namespace std;
 namespace fs = filesystem;
@@ -16,19 +22,19 @@ namespace fs = filesystem;
 extern int transaction_amount_min;
 extern int transaction_amount_max;
 extern int queuing_delay_constant;
-extern int percent_fast;
-extern int percent_high_cpu;
 extern int propagation_delay_min;
 extern int propagation_delay_max;;
 extern int propagation_delay_malicious_min;
 extern int propagation_delay_malicious_max;
 extern long long simulation_time;
-extern long long total_hashing_power;
 extern int block_inter_arrival_time;
+extern int timer_timeout_time;
 extern int transaction_size;
+extern int hash_size;
+extern int get_message_size;
 extern int mining_reward;
 extern EQ event_queue;
-extern int percent_malicious_nodes;
+
 
 // Link between two nodes
 class Link
@@ -41,51 +47,66 @@ public:
   // keeps track of transactions and blocks sent to avoid loops
   set<long long> transactions_sent;
   set<long long> blocks_sent;
+  set<long long> get_message_sent;
+  set<long long> hash_sent;
 
   Link(int peer, int propagation_delay, long long link_speed);
 };
 
 class Node
 {
-protected:
+private:
   // to generate unique node ids (equal to index in node vector)
   static int node_ticket;
 
 public:
+  // Node attributes
   int id;
   bool fast;
-  bool high_cpu;
-  long long hashing_power;
+  bool malicious;
+  bool ringmaster;
   bool currently_mining;
-  vector<Link> peers; // stores links to all its peers
-  shared_ptr<Block> genesis; // genesis block pointer
-  set<shared_ptr<LeafNode>,CompareLeafNodePtr> leaves; // stores information about all leaf nodes of blockchain tree
   queue<shared_ptr<Transaction>> mempool;
   set <long long> transactions_in_pool;
+  long long hashing_power{};
+
+  // Links
+  vector<Link> peers; // stores links to all its peers
+  vector<Link> malicious_peers; // empty for honest
+
+  // Blockchain
+  shared_ptr<Block> genesis; // genesis block pointer
+  set<shared_ptr<LeafNode>,CompareLeafNodePtr> leaves; // stores information about all leaf nodes of blockchain tree
   map<long long, long long> block_ids_in_tree; // stores received blocks <block id, time first seen>
+  shared_ptr<LeafNode> private_leaf; // for ringmaster
+
+  // Statistics
   long long transactions_received;
   long long blocks_received;
 
-  Node();
-  virtual ~Node() {};
-  // Function to compute the union of peers and malicious_peers
-  virtual size_t get_union_of_peers_size();
+  // Timers
+  map <long long, Timer> timers; // block id and timer object
+  set <long long> hashes_seen; // stores block id
 
+  Node();
   // creates a random transaction and broadcasts it to its peers
   void create_transaction();
-
   //  receive a transaction from peer
   void receive_transaction(const receive_transaction_object &obj);
-
   // send transaction to particular link
   void send_transaction_to_link(const shared_ptr<Transaction>& txn, Link &link) const;
-
+  // receive hash from peer
+  void send_get_to_node(int node_id, shared_ptr<Block> blk);
+  void receive_hash(const receive_hash_object& obj);
+  void timer_expired(const timer_expired_object &obj);
   // receive a block from peer
   void receive_block(const receive_block_object &obj);
-
   // true: block added to the longest chain
   // false: validation failed or block added to some forked branch
   bool validate_and_add_block(shared_ptr<Block> blk);
+  void broadcast_hash(const shared_ptr<Block>& blk);
+
+
 
   // Prepare block and start mining
   void mine_block();
@@ -93,26 +114,10 @@ public:
   // add mined block to tree if longest not changed
   void complete_mining(const shared_ptr<Block>& blk);
 
-  // broadcast block to all peers
-  void broadcast_block(const shared_ptr<Block>& blk);
-};
+  // send block to requester
+  void send_block(const get_block_request_object &obj);
 
-
-
-// Malicious Node
-class MaliciousNode : public Node {
-public:
-  vector<Link> malicious_peers;
-  MaliciousNode();
-  size_t get_union_of_peers_size();
-};
-
-// Ringmaster
-class RingMasterNode : public MaliciousNode {
-public:
-  long long global_chain_length;
-  long long private_chain_length;
-  RingMasterNode();
+  long long compute_hash(shared_ptr<Block> blk);
 
 };
 
@@ -121,7 +126,7 @@ public:
 class Network
 {
 public:
-  vector<shared_ptr<Node>> nodes;
+  vector<Node> nodes;
   vector<int> malicious_node_ids; // indexes of subset of nodes which are only malicious
   vector<int> honest_node_ids;
   int ringmaster_node_id;

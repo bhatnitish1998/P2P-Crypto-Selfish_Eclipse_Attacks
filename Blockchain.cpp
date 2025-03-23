@@ -36,6 +36,11 @@ bool CompareLeafNodePtr::operator()(const std::shared_ptr<LeafNode>& a, const st
     else return a->length > b->length;
 }
 
+Timer::Timer(shared_ptr<Block> blk)
+{
+    this->blk = std::move(blk);
+}
+
 ostream& operator<<(ostream& os, const Transaction& txn)
 {
     if (txn.coinbase)

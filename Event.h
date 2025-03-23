@@ -10,6 +10,9 @@
 #define RECEIVE_TRANSACTION 1
 #define RECEIVE_BLOCK 2
 #define BLOCK_MINED 3
+#define RECEIVE_HASH 4
+#define GET_BLOCK_REQUEST 5
+#define TIMER_EXPIRED 6
 
 #include <variant>
 #include <queue>
@@ -50,7 +53,39 @@ struct block_mined_object
     friend ostream& operator<<(ostream& os, const block_mined_object& obj);
 };
 
-typedef variant<create_transaction_object, receive_transaction_object, receive_block_object, block_mined_object> VO;
+struct receive_hash_object
+{
+    int sender_node_id;
+    int receiver_node_id;
+    long long block_hash;
+    shared_ptr<Block> blk;
+    receive_hash_object(long long block_hash,int sender_node_id, int receiver_node_id, const shared_ptr<Block>& blk);
+    friend ostream& operator<<(ostream& os, const receive_hash_object& obj);
+
+};
+
+struct get_block_request_object
+{
+    int sender_node_id;
+    int receiver_node_id;
+    shared_ptr<Block> blk;
+    get_block_request_object(int sender_node_id, int receiver_node_id, const shared_ptr<Block>& blk);
+    friend ostream& operator<<(ostream& os, const get_block_request_object& obj);
+
+};
+
+struct timer_expired_object
+{
+    int node_id;
+    shared_ptr<Block> blk;
+
+    timer_expired_object(int node_id, const shared_ptr<Block>& blk);
+    friend ostream& operator<<(ostream& os, const timer_expired_object& obj);
+};
+
+
+typedef variant<create_transaction_object, receive_transaction_object, receive_block_object, block_mined_object, receive_hash_object
+,get_block_request_object,timer_expired_object> VO;
 
 class Event
 {

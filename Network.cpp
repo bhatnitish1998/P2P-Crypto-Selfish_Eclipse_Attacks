@@ -1,9 +1,6 @@
 #include "Network.h"
 
-#include <algorithm>
-#include <iostream>
 
-#include "utility_functions.h"
 
 int Node::node_ticket = 0;
 
@@ -18,45 +15,20 @@ Node::Node()
 {
     id = node_ticket++;
     fast = false;
-    high_cpu = false;
-    hashing_power = 1;  // all honest 1, malicious 0 , ringmaster = num_malicious_nodes
-    peers.reserve(6);
-    genesis = nullptr;
+    malicious = false;
+    ringmaster = false;
     currently_mining = false;
+
+    peers.reserve(6);
+    malicious_peers.reserve(6);
+
+    genesis = nullptr;
+    private_leaf = nullptr;
+
     transactions_received = 0;
     blocks_received = 0;
 }
 
-MaliciousNode::MaliciousNode() : Node() {
-    malicious_peers.reserve(6);
-    fast = true;
-}
-
-RingMasterNode::RingMasterNode() : MaliciousNode() {
-    global_chain_length =0;
-    private_chain_length=0;
-}
-
-// Function to compute the size of union of peers and malicious_peers
-size_t Node::get_union_of_peers_size() {
-    return peers.size();
-}
-
-size_t MaliciousNode::get_union_of_peers_size() {
-    std::set<int> union_set;
-
-    // Add all peer indices from peers
-    for (const Link& link : peers) {
-        union_set.insert(link.peer);
-    }
-
-    // Add all peer indices from malicious_peers
-    for (const Link& link : malicious_peers) {
-        union_set.insert(link.peer);
-    }
-
-    return union_set.size();
-}
 
 void Node::create_transaction()
 {
@@ -115,6 +87,75 @@ void Node::receive_transaction(const receive_transaction_object& obj)
     }
 }
 
+void Node::send_get_to_node(int node_id, shared_ptr<Block> blk)
+{
+    for ( auto& link: peers)
+    {
+        if (link.peer == node_id)
+        {
+            get_block_request_object gobj(id,node_id,blk);
+            const long long latency = link.propagation_delay + get_message_size/link.link_speed + \
+            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+            event_queue.emplace(simulation_time + latency,GET_BLOCK_REQUEST,gobj);
+            break;
+        }
+    }
+}
+
+
+void Node::receive_hash(const receive_hash_object &obj)
+{
+    if (block_ids_in_tree.count(obj.blk->id) == 1)
+        return;
+
+    if (hashes_seen.count(obj.blk->id) == 0)
+    {
+        hashes_seen.insert(obj.blk->id);
+
+        // Generate get block request event
+        send_get_to_node(obj.sender_node_id,obj.blk);
+
+        // Add timer
+        Timer t(obj.blk);
+        t.tried_senders.insert(obj.sender_node_id);
+        timers.emplace(obj.blk->id,t);
+
+        // Generate timer expired event;
+        timer_expired_object tobj(id,obj.blk);
+        event_queue.emplace(simulation_time+ timer_timeout_time, TIMER_EXPIRED,tobj);
+    }
+    else
+    {
+        if (auto it = timers.find(obj.blk->id); it != timers.end())
+        {
+            it->second.available_senders.push(obj.sender_node_id);
+        }
+    }
+}
+
+
+
+
+void Node::timer_expired(const timer_expired_object& obj)
+{
+    auto it = timers.find(obj.blk->id);
+    if (it == timers.end()) return;
+    if (it->second.available_senders.empty()) return;
+
+    // send to the next available
+    int next_sender = it->second.available_senders.front();
+    it->second.available_senders.pop();
+    while (it->second.tried_senders.count(next_sender)!=0)
+    {
+        next_sender = it->second.available_senders.front();
+        it->second.available_senders.pop();
+    }
+
+    it->second.tried_senders.insert(next_sender);
+    send_get_to_node(next_sender,obj.blk);
+}
+
+
 void Node::receive_block(const receive_block_object& obj)
 {
     // check if block already present
@@ -146,6 +187,11 @@ void Node::receive_block(const receive_block_object& obj)
     if (validate_and_add_block(obj.blk))
     {
         l.log << "Time "<< simulation_time <<": Node " << id << " block  "<<obj.blk->id<< " extended longest chain" << endl;
+
+        // remove corresponding timer
+        auto it = timers.find(obj.blk->id);
+        if (it != timers.end()) timers.erase(it);
+
         mine_block();
     }
 }
@@ -211,7 +257,7 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
     }
 
     // if validated broadcast block and insert into tree.
-    broadcast_block(blk);
+    broadcast_hash(blk);
     block_ids_in_tree.insert({blk->id,simulation_time});
 
     l.log << "Time "<< simulation_time <<": Node " << id << " successfully validated block  "<<blk->id<<endl;
@@ -231,6 +277,25 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
     return (previous_longest != current_longest);
 }
 
+void Node::broadcast_hash(const shared_ptr<Block>& blk)
+{
+    for (auto link : peers)
+    {
+        // send hash if not already sent to the peer
+        if (link.hash_sent.count(blk->id) == 0)
+        {
+            link.hash_sent.insert(blk->id);
+            const long long latency = link.propagation_delay + hash_size/link.link_speed + \
+            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+
+            // create receive hash event for that node at current time + latency
+            long long hash_value = compute_hash(blk);
+            receive_hash_object obj(hash_value,id,link.peer,blk);
+            Event e(simulation_time + latency,RECEIVE_HASH,obj);
+            event_queue.push(e);
+        }
+    }
+}
 
 void Node::mine_block()
 {
@@ -311,26 +376,32 @@ void Node::complete_mining(const shared_ptr<Block>&  blk)
     }
 }
 
-void Node::broadcast_block(const shared_ptr<Block>& blk)
-{
-    const long long size = (transaction_size) * static_cast<long long>(blk->transactions.size());
-
+void Node::send_block(const get_block_request_object &obj){
+    const long long size = (transaction_size) * static_cast<long long>(obj.blk->transactions.size());
     for (auto link : peers)
     {
-        // send block if not already sent to the peer
-        if (link.blocks_sent.count(blk->id) == 0)
+        if (link.peer == obj.sender_node_id)
         {
-            link.blocks_sent.insert(blk->id);
-            const long long latency = link.propagation_delay + size/link.link_speed + \
-            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+            if (link.blocks_sent.count(obj.blk->id) == 0)
+            {
+                link.blocks_sent.insert(obj.blk->id);
+                const long long latency = link.propagation_delay + size/link.link_speed + \
+                exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
 
-            // create receive block event for that node at current time + latency
-            receive_block_object obj(id,link.peer,blk);
-            Event e(simulation_time + latency,RECEIVE_BLOCK,obj);
-            event_queue.push(e);
+                // create receive block event for that node at current time + latency
+                receive_block_object robj(id,link.peer,obj.blk);
+                Event e(simulation_time + latency,RECEIVE_BLOCK,robj);
+                event_queue.push(e);
+            }
         }
     }
 }
+
+long long Node::compute_hash(shared_ptr<Block> blk)
+{
+    return blk->id;
+}
+
 
 void Network::build_network(vector<int> &node_ids,string networkType){
     bool done = false;
@@ -399,18 +470,18 @@ void Network::build_network(vector<int> &node_ids,string networkType){
         {
             if (i < x)
             {
-                int propagation_delay = uniform_distribution(propagation_delay_malicious_min,propagation_delay_malicious_max); // 1ms to 10ms
-                int link_speed = nodes[i]->fast && nodes[x]->fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
+
+                int link_speed = nodes[i].fast && nodes[x].fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
 
                 if (networkType == "common"){
-                    nodes[i]->peers.emplace_back(x, propagation_delay, link_speed);
-                    nodes[x]->peers.emplace_back(i, propagation_delay, link_speed);
+                    int propagation_delay = uniform_distribution(propagation_delay_min,propagation_delay_max);
+                    nodes[i].peers.emplace_back(x, propagation_delay, link_speed);
+                    nodes[x].peers.emplace_back(i, propagation_delay, link_speed);
                 }
                 else{
-                    MaliciousNode* maliciousNodeI = dynamic_cast<MaliciousNode*>(nodes[i].get());
-                    MaliciousNode* maliciousNodeX = dynamic_cast<MaliciousNode*>(nodes[x].get());
-                    maliciousNodeI->malicious_peers.emplace_back(x, propagation_delay, link_speed);
-                    maliciousNodeX->malicious_peers.emplace_back(i, propagation_delay, link_speed);
+                    int propagation_delay = uniform_distribution(propagation_delay_malicious_min,propagation_delay_malicious_max); // 1ms to 10ms
+                    nodes[i].malicious_peers.emplace_back(x, propagation_delay, link_speed);
+                    nodes[x].malicious_peers.emplace_back(i, propagation_delay, link_speed);
                 }
             }
         }
@@ -435,30 +506,31 @@ Network::Network()
     for(int i=0; i<number_of_nodes; i++){
         if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){
             if (assigned_ringmaster){
-                nodes[i] = make_shared<MaliciousNode>();
-                nodes[i]->hashing_power = 0;
+                nodes[i].malicious = true;
+                nodes[i].hashing_power = 0;
+                nodes[i].fast = true;
             }
             else{
-                nodes[i] = make_shared<RingMasterNode>();
-                nodes[i]->hashing_power = (double) malicious_node_ids.size();
+                nodes[i].malicious = true;
+                nodes[i].ringmaster = true;
+                nodes[i].fast = true;
+                nodes[i].hashing_power =static_cast<long long> (malicious_node_ids.size());
+
                 assigned_ringmaster = true;
-                cout<<"Ringmaster id: " << nodes[i]->id<<endl;
+                cout<<"Ringmaster id: " << nodes[i].id<<endl;
+                ringmaster_node_id = nodes[i].id;
             }
         }
         else{
             honest_node_ids.push_back(i);
-            nodes[i] = make_shared<Node>();
-            nodes[i]->hashing_power = 1;
+            nodes[i].hashing_power = 1;
         }
 
-        total_hashing_power += nodes[i]->hashing_power;
     }
 
 
     build_network(all_node_ids, "common");
     build_network(malicious_node_ids, "malicious");
-
-    write_node_details_to_file(nodes, "all_node_details.csv");
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

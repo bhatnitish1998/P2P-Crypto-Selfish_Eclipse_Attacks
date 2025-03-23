@@ -33,6 +33,51 @@ block_mined_object::block_mined_object(const int miner_node_id, const shared_ptr
     this->blk = blk;
 }
 
+receive_hash_object::receive_hash_object(long long block_hash,int sender_node_id, int receiver_node_id, const shared_ptr<Block>& blk)
+{
+    this->sender_node_id= sender_node_id;
+    this->receiver_node_id = receiver_node_id;
+    this->block_hash = block_hash; // dummy
+    this->blk = blk;
+}
+
+get_block_request_object::get_block_request_object(int sender_node_id, int receiver_node_id,
+    const shared_ptr<Block>& blk)
+{
+    this->sender_node_id = sender_node_id;
+    this->receiver_node_id = receiver_node_id;
+    this->blk = blk;
+}
+
+timer_expired_object::timer_expired_object(int node_id, const shared_ptr<Block>& blk)
+{
+    this->node_id = node_id;
+    this->blk = blk;
+}
+
+ostream& operator<<(ostream& os, const timer_expired_object& obj)
+{
+    os << " Timer expired event: "<<endl;
+    os << " Node id: " << obj.node_id << endl;
+    return os;
+}
+
+ostream& operator<<(ostream& os, const get_block_request_object& obj)
+{
+    os << "Get block request object: " <<endl;
+    os << "Sender: " << obj.sender_node_id << " Receiver: " << obj.receiver_node_id << " Block id: " << obj.blk->id
+   << endl;
+    return os;
+}
+
+ostream& operator<<(ostream& os, const receive_hash_object& obj)
+{
+    os << "Receive hash object: " <<endl;
+    os << "Sender: " << obj.sender_node_id << " Receiver: " << obj.receiver_node_id << " Block id: " << obj.blk->id
+    << endl;
+    return os;
+}
+
 Event::Event(const long long time, const int type, VO object): time(time), type(type), object(std::move(object))
 {
 }

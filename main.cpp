@@ -19,19 +19,19 @@ int transaction_amount_min = 5;
 int transaction_amount_max = 20;
 int queuing_delay_constant = 96;  // 96000 per second
 int transaction_size = 1024 * 8;
+int hash_size = 64*8;
+int get_message_size = 64*8;
 int mining_reward = 50;
 
 // experiment parameters
 int number_of_nodes;
-int percent_fast;
-int percent_high_cpu;
 int percent_malicious_nodes;
 int mean_transaction_inter_arrival_time;
 int block_inter_arrival_time;
+int timer_timeout_time;
 
 // Simulation variables
 long long simulation_time = 0;
-long long total_hashing_power = 0;
 EQ event_queue;
 unsigned int global_seed = 911;
 Logger l;
@@ -42,23 +42,23 @@ int main(int argc, char* argv[])
     if (argc != 6)
     {
         cerr << "Usage: " << argv[0] <<
-            " <number_of_nodes> <percent_fast> <percent_high_cpu> <mean_transaction_inter_arrival_time> <block_inter_arrival_time>"
+            " <number_of_nodes> <percent_malicious> <mean_transaction_inter_arrival_time> <block_inter_arrival_time> <timeout time>"
             << endl;
         cerr << "  mean_transaction_inter_arrival_time: milli-seconds" << endl;
         cerr << "  block_inter_arrival_time: seconds" << endl;
+        cerr << "  timeout time: milli-seconds" << endl;
         return 1;
     }
 
     number_of_nodes = stoi(argv[1]);
-    percent_fast = stoi(argv[2]);
-    percent_high_cpu = stoi(argv[3]);
-    mean_transaction_inter_arrival_time = stoi(argv[4]);
-    block_inter_arrival_time = stoi(argv[5])* 1000 ;
-    percent_malicious_nodes = 50;
+    percent_malicious_nodes = stoi(argv[2]);
+    mean_transaction_inter_arrival_time = stoi(argv[3]);
+    block_inter_arrival_time = stoi(argv[4])* 1000 ;
+    timer_timeout_time = stoi(argv[5]);
 
 
-    if (number_of_nodes < 1 || percent_fast < 0 || percent_fast > 100 || percent_high_cpu < 0 || percent_high_cpu > 100
-        || mean_transaction_inter_arrival_time <= 0 || block_inter_arrival_time <= 0)
+    if (number_of_nodes < 1 ||  percent_malicious_nodes < 0 || percent_malicious_nodes > 100
+        || mean_transaction_inter_arrival_time <= 0 || block_inter_arrival_time <= 0 || timer_timeout_time <= 0)
     {
         cerr << "Invalid argument values" << endl;
         return 1;
@@ -68,14 +68,18 @@ int main(int argc, char* argv[])
     cout << "----------------------------------------------------------------------" << endl;
     cout << "Simulation Configuration:" << endl;
     cout << "  Number of Nodes: " << number_of_nodes << endl;
-    cout << "  Percent Fast: " << percent_fast << "%" << endl;
-    cout << "  Percent High CPU: " << percent_high_cpu << "%" << endl;
+    cout << "  Percent Malicious: " << percent_malicious_nodes << "%" << endl;
     cout << "  Mean Transaction Inter-Arrival Time: " << mean_transaction_inter_arrival_time << " ms" << endl;
     cout << "  Block Inter-Arrival Time: " << block_inter_arrival_time << " ms" << endl;
+    cout << "  Timeout Time: " << timer_timeout_time << " ms" << endl;
+
     cout << "  Propagation Delay (Min-Max): " << propagation_delay_min << " - " << propagation_delay_max << " ms" <<
         endl;
+    cout << "  Propagation Delay Malicious (Min-Max): " << propagation_delay_malicious_min << " - " << propagation_delay_malicious_max << " ms" << endl;
     cout << "  Queuing Delay Constant: " << queuing_delay_constant << " bits/sec" << endl;
     cout << "  Transaction Size: " << transaction_size << " bits" << endl;
+    cout << "  Hash size: " << hash_size << endl;
+    cout << "  Get message size: " << get_message_size << endl;
     cout << "  Mining reward: " << mining_reward << " bitcoins" << endl;
     cout << "  Initial Bitcoins with each node: " << initial_bitcoin << endl;
     cout << "  Initial Number of Transactions: " << initial_number_of_transactions << endl;

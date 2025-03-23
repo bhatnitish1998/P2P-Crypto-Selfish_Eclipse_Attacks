@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
-#include "Network.h"
 #include <map>
 
 using namespace std;
@@ -37,7 +36,5 @@ void write_network_to_file(vector<vector<int>>& al,const string& fname);
 
 void write_network_to_file_map(map<int, vector<int>>& al,const string &fname);
 
-// creates a csv files to store all nodes details
-void write_node_details_to_file(const vector<shared_ptr<Node>>& nodes, const string &fname);
 
 #endif //UTILITY_H

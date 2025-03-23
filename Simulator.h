@@ -34,6 +34,8 @@ public:
     void start();
     // write stats of each node to file
     void write_node_stats_to_file();
+    // creates a csv files to store all nodes details
+    void write_all_node_details_to_file(const vector<Node>& nodes, const string &fname);
 };
 
 struct block_stats
