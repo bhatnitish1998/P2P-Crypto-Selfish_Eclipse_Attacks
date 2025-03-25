@@ -6,7 +6,7 @@
 
 void Simulator::create_genesis()
 {
-    auto genesis = make_shared<Block>(0, nullptr);
+    auto genesis = make_shared<Block>(0, nullptr,true);
     // create coinbase transaction for each node with initial bitcoin
     for (int i = 0; i < number_of_nodes; i++)
     {
@@ -45,6 +45,20 @@ void Simulator::create_genesis()
 void Simulator::create_initial_transactions()
 {
     long long event_time = 0; // variable to keep track of future time
+
+    // make sure ringmaster can immediately start mining.
+    for (int i = 0; i < number_of_nodes; i++)
+    {
+        if (network.nodes[i].ringmaster)
+        {
+            const int creator_node_id = i;
+            // create transaction object and put into  event_queue
+            create_transaction_object obj(creator_node_id);
+            auto e = Event(0,CREATE_TRANSACTION, obj);
+            event_queue.push(e);
+            break;
+        }
+    }
 
     for (int i = 0; i < initial_number_of_transactions; i++)
     {
@@ -149,6 +163,9 @@ void Simulator::write_node_stats_to_file()
             cerr << "An Error occurred while opening file!" << endl;
             return;
         }
+
+        if (network.nodes[i].private_leaf != nullptr)
+            network.nodes[i].leaves.insert(network.nodes[i].private_leaf);
 
         file << "Node ID: " << network.nodes[i].id << endl;
         file << "Fast node: " << network.nodes[i].fast << endl;

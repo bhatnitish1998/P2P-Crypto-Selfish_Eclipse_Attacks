@@ -16,11 +16,12 @@ Transaction::Transaction(const int receiver, const int amount, const bool coinba
     if (coinbase && sender != -1) throw invalid_argument("sender present for coinbase transaction");
 }
 
-Block::Block(const long long creation_time,  shared_ptr<Block> parent_block)
+Block::Block(const long long creation_time,  shared_ptr<Block> parent_block,bool is_honest)
 {
     id = block_ticket++;
     this->parent_block = std::move(parent_block);
     this->creation_time = creation_time;
+    this->is_honest = is_honest;
 }
 
 LeafNode::LeafNode( shared_ptr<Block> block, const long long length)

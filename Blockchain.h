@@ -38,8 +38,9 @@ public:
     shared_ptr<Block> parent_block;
     vector<shared_ptr<Transaction>> transactions;
     long long creation_time;
+    bool is_honest;
 
-    Block(long long creation_time, shared_ptr<Block> parent_block);
+    Block(long long creation_time, shared_ptr<Block> parent_block, bool is_honest);
     friend ostream& operator<<(ostream& os, const Block& block);
 };
 

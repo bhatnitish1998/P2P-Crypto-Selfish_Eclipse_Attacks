@@ -1,6 +1,6 @@
 #include "Network.h"
 
-
+#include "Simulator.h"
 
 int Node::node_ticket = 0;
 
@@ -87,19 +87,12 @@ void Node::receive_transaction(const receive_transaction_object& obj)
     }
 }
 
-void Node::send_get_to_node(int node_id, shared_ptr<Block> blk)
+void Node::send_get_to_link(const shared_ptr<Block>& blk, Link &link) const
 {
-    for ( auto& link: peers)
-    {
-        if (link.peer == node_id)
-        {
-            get_block_request_object gobj(id,node_id,blk);
-            const long long latency = link.propagation_delay + get_message_size/link.link_speed + \
-            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
-            event_queue.emplace(simulation_time + latency,GET_BLOCK_REQUEST,gobj);
-            break;
-        }
-    }
+    get_block_request_object gobj(id,link.peer,blk);
+    const long long latency = link.propagation_delay + get_message_size/link.link_speed + \
+    exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+    event_queue.emplace(simulation_time + latency,GET_BLOCK_REQUEST,gobj);
 }
 
 
@@ -113,7 +106,14 @@ void Node::receive_hash(const receive_hash_object &obj)
         hashes_seen.insert(obj.blk->id);
 
         // Generate get block request event
-        send_get_to_node(obj.sender_node_id,obj.blk);
+        for ( auto& link: peers)
+        {
+            if (link.peer == obj.sender_node_id)
+            {
+                send_get_to_link(obj.blk,link);
+                break;
+            }
+        }
 
         // Add timer
         Timer t(obj.blk);
@@ -134,8 +134,6 @@ void Node::receive_hash(const receive_hash_object &obj)
 }
 
 
-
-
 void Node::timer_expired(const timer_expired_object& obj)
 {
     auto it = timers.find(obj.blk->id);
@@ -151,8 +149,16 @@ void Node::timer_expired(const timer_expired_object& obj)
         it->second.available_senders.pop();
     }
 
+    // send get request to next sender
     it->second.tried_senders.insert(next_sender);
-    send_get_to_node(next_sender,obj.blk);
+    for ( auto& link: peers)
+    {
+        if (link.peer == next_sender)
+        {
+            send_get_to_link(obj.blk,link);
+            break;
+        }
+    }
 }
 
 
@@ -168,6 +174,8 @@ void Node::receive_block(const receive_block_object& obj)
     // if block received before parent
     if (block_ids_in_tree.count(obj.blk->parent_block->id) == 0)
     {
+        if (obj.tries > maximum_retries)
+            return;
         l.log <<"Time "<< simulation_time << ": Node " << id << " NACK block  "<<obj.blk->id<<endl;
         // simulate resending the block by the peer (assume ACK, NACK mechanism)
         for (const auto& link: peers)
@@ -177,12 +185,13 @@ void Node::receive_block(const receive_block_object& obj)
                 const long long size = transaction_size * static_cast<long long>(obj.blk->transactions.size());
                 const long long latency = link.propagation_delay + size/link.link_speed + \
                 exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
-                Event e(simulation_time + latency,RECEIVE_BLOCK,receive_block_object(obj.sender_node_id,obj.receiver_node_id,obj.blk));
+                Event e(simulation_time + latency,RECEIVE_BLOCK,receive_block_object(obj.sender_node_id,obj.receiver_node_id,obj.blk,obj.tries+1));
                 event_queue.push(e);
             }
         }
         return;
     }
+
     // if validated and added to the longest chain, re-start mining on longest chain
     if (validate_and_add_block(obj.blk))
     {
@@ -198,45 +207,56 @@ void Node::receive_block(const receive_block_object& obj)
 
 bool Node::validate_and_add_block(shared_ptr<Block> blk)
 {
-    // check if the parent node of the block is leaf node
-    const auto it = find_if(leaves.begin(),leaves.end(),\
-        [&blk](const shared_ptr<LeafNode>& leaf){return blk->parent_block->id == leaf->block->id;});
     vector<long long > temp_balance;
     set<long long > temp_transaction_ids;
     long long temp_length =1;
+    const auto it = find_if(leaves.begin(),leaves.end(),\
+            [&blk](const shared_ptr<LeafNode>& leaf){return blk->parent_block->id == leaf->block->id;});
 
-    // if parent not a leaf
-    if (it == leaves.end())
+
+
+    if (selfish_mining && malicious && private_leaf != nullptr && !blk->is_honest )
     {
-        temp_balance.resize(number_of_nodes,0);
+        temp_balance = private_leaf->balance;
+        temp_transaction_ids = private_leaf->transaction_ids;
+        temp_length = private_leaf->length+1;
 
-        // traverse the chain till genesis and get balance and transaction ids
-        auto temp_ptr = blk->parent_block;
-        while (temp_ptr)
-        {
-            for (const auto& txn: temp_ptr->transactions)
-            {
-                temp_transaction_ids.insert(txn->id);
-
-                if (txn->coinbase) temp_balance[txn->receiver]+=txn->amount;
-                else
-                {
-                    temp_balance[txn->sender]-=txn->amount;
-                    temp_balance[txn->receiver]+=txn->amount;
-                }
-            }
-            temp_ptr = temp_ptr->parent_block;
-            temp_length++;
-        }
     }
-    // if parent is a leaf get it from leaf node
     else
     {
-        temp_balance = (*it)->balance;
-        temp_transaction_ids = (*it)->transaction_ids;
-        temp_length = (*it)->length+1;
-    }
+        // check if the parent node of the block is leaf node
+        // if parent not a leaf
+        if (it == leaves.end())
+        {
+            temp_balance.resize(number_of_nodes,0);
 
+            // traverse the chain till genesis and get balance and transaction ids
+            auto temp_ptr = blk->parent_block;
+            while (temp_ptr)
+            {
+                for (const auto& txn: temp_ptr->transactions)
+                {
+                    temp_transaction_ids.insert(txn->id);
+
+                    if (txn->coinbase) temp_balance[txn->receiver]+=txn->amount;
+                    else
+                    {
+                        temp_balance[txn->sender]-=txn->amount;
+                        temp_balance[txn->receiver]+=txn->amount;
+                    }
+                }
+                temp_ptr = temp_ptr->parent_block;
+                temp_length++;
+            }
+        }
+        // if parent is a leaf get it from leaf node
+        else
+        {
+            temp_balance = (*it)->balance;
+            temp_transaction_ids = (*it)->transaction_ids;
+            temp_length = (*it)->length+1;
+        }
+    }
 
     // validate the block
     for (const auto& txn: blk->transactions)
@@ -267,19 +287,33 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
     temp_leaf->balance= std::move(temp_balance);
     temp_leaf->transaction_ids = std::move(temp_transaction_ids);
 
-    // return true if longest changes after inserting
-    const long long previous_longest = (*leaves.begin())->block->id;
-    if (it != leaves.end())
-        leaves.erase(it);
-    leaves.insert(temp_leaf);
-    const long long current_longest = (*leaves.begin())->block->id;
 
-    return (previous_longest != current_longest);
+    if ( selfish_mining && malicious && !blk->is_honest)
+    {
+        private_leaf = temp_leaf;
+        return true;
+    }
+    else
+    {
+        // return true if longest changes after inserting
+        const long long previous_longest = (*leaves.begin())->block->id;
+        if (it != leaves.end())
+            leaves.erase(it);
+        leaves.insert(temp_leaf);
+        const long long current_longest = (*leaves.begin())->block->id;
+
+        return (previous_longest != current_longest);
+    }
+
 }
 
 void Node::broadcast_hash(const shared_ptr<Block>& blk)
 {
-    for (auto link : peers)
+    vector<Link> peers_to_send = peers;
+    if (selfish_mining && malicious && !blk->is_honest)
+        peers_to_send = malicious_peers;
+
+    for (auto link : peers_to_send)
     {
         // send hash if not already sent to the peer
         if (link.hash_sent.count(blk->id) == 0)
@@ -307,7 +341,13 @@ void Node::mine_block()
     }
     // create the new block with coinbase transaction
     shared_ptr<LeafNode> longest_leaf = *leaves.begin();
-    auto blk = make_shared<Block>(simulation_time,longest_leaf->block);
+
+    if (selfish_mining && malicious && private_leaf!= nullptr)
+    {
+        longest_leaf = private_leaf;
+    }
+
+    auto blk = make_shared<Block>(simulation_time,longest_leaf->block,!malicious);
     blk->transactions.push_back(make_shared<Transaction>(id,mining_reward,true));
     vector<long long > temp_balance = longest_leaf->balance;
 
@@ -350,6 +390,11 @@ void Node::mine_block()
 void Node::complete_mining(const shared_ptr<Block>&  blk)
 {
     shared_ptr<LeafNode> longest_leaf = *leaves.begin();
+
+    if (selfish_mining && malicious && private_leaf!= nullptr && !blk->is_honest)
+    {
+        longest_leaf = private_leaf;
+    }
     // if longest chain has not changed while mining
     if (blk->parent_block->id == longest_leaf->block->id)
     {
@@ -359,7 +404,6 @@ void Node::complete_mining(const shared_ptr<Block>&  blk)
         // start mining next block
         mine_block();
     }
-
     // if failed return transactions to the mempool
     else
     {
@@ -377,8 +421,23 @@ void Node::complete_mining(const shared_ptr<Block>&  blk)
 }
 
 void Node::send_block(const get_block_request_object &obj){
+
+    // Network& network = Network::getInstance();
+    // if (eclipse_attack && malicious && !network.nodes[obj.sender_node_id].malicious && obj.blk->is_honest)
+    //     return;
+    //
     const long long size = (transaction_size) * static_cast<long long>(obj.blk->transactions.size());
-    for (auto link : peers)
+    //
+    // // if attacker overlay exists send through that
+    vector<Link> to_send_peers = peers;
+    // if (malicious && network.nodes[obj.sender_node_id].malicious)
+    // {
+    //     for (const auto& link : malicious_peers)
+    //       if (link.peer == obj.sender_node_id)
+    //           to_send_peers = malicious_peers;
+    // }
+
+    for (auto link : to_send_peers)
     {
         if (link.peer == obj.sender_node_id)
         {
@@ -389,7 +448,7 @@ void Node::send_block(const get_block_request_object &obj){
                 exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
 
                 // create receive block event for that node at current time + latency
-                receive_block_object robj(id,link.peer,obj.blk);
+                receive_block_object robj(id,link.peer,obj.blk,0);
                 Event e(simulation_time + latency,RECEIVE_BLOCK,robj);
                 event_queue.push(e);
             }
@@ -399,11 +458,18 @@ void Node::send_block(const get_block_request_object &obj){
 
 long long Node::compute_hash(shared_ptr<Block> blk)
 {
+    //TODO: Compute actual hash and return
     return blk->id;
 }
 
 
-void Network::build_network(vector<int> &node_ids,string networkType){
+Network& Network::getInstance()
+{
+    static Network instance;
+    return instance;
+}
+
+void Network::build_network(vector<int> &node_ids,const string& networkType){
     bool done = false;
     map<int, vector<int>> mal;  // adjacency list as a map
 

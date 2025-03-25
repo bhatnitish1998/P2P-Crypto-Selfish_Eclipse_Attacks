@@ -41,7 +41,8 @@ struct receive_block_object
     int sender_node_id;
     int receiver_node_id;
     shared_ptr<Block> blk;
-    receive_block_object(int sender_node_id, int receiver_node_id, const shared_ptr<Block>& blk);
+    int tries;
+    receive_block_object(int sender_node_id, int receiver_node_id, const shared_ptr<Block>& blk, int tries);
     friend ostream& operator<<(ostream& os, const receive_block_object& obj);
 };
 

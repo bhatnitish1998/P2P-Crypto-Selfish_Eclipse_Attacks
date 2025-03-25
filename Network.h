@@ -34,7 +34,9 @@ extern int hash_size;
 extern int get_message_size;
 extern int mining_reward;
 extern EQ event_queue;
-
+extern bool eclipse_attack;
+extern bool selfish_mining;
+extern int maximum_retries;
 
 // Link between two nodes
 class Link
@@ -93,47 +95,48 @@ public:
   void create_transaction();
   //  receive a transaction from peer
   void receive_transaction(const receive_transaction_object &obj);
-  // send transaction to particular link
+  // send transaction and get requests to particular link
   void send_transaction_to_link(const shared_ptr<Transaction>& txn, Link &link) const;
+  void send_get_to_link(const shared_ptr<Block>& blk, Link &link) const;
   // receive hash from peer
-  void send_get_to_node(int node_id, shared_ptr<Block> blk);
   void receive_hash(const receive_hash_object& obj);
   void timer_expired(const timer_expired_object &obj);
-  // receive a block from peer
-  void receive_block(const receive_block_object &obj);
+  // Prepare block and start mining
+  void mine_block();
+  // add mined block to tree if longest not changed
+  void complete_mining(const shared_ptr<Block>& blk);
   // true: block added to the longest chain
   // false: validation failed or block added to some forked branch
   bool validate_and_add_block(shared_ptr<Block> blk);
   void broadcast_hash(const shared_ptr<Block>& blk);
-
-
-
-  // Prepare block and start mining
-  void mine_block();
-
-  // add mined block to tree if longest not changed
-  void complete_mining(const shared_ptr<Block>& blk);
-
+  // receive a block from peer
+  void receive_block(const receive_block_object &obj);
   // send block to requester
   void send_block(const get_block_request_object &obj);
-
   long long compute_hash(shared_ptr<Block> blk);
-
 };
 
 
 
 class Network
 {
+private:
+  Network();
+
 public:
   vector<Node> nodes;
   vector<int> malicious_node_ids; // indexes of subset of nodes which are only malicious
   vector<int> honest_node_ids;
   int ringmaster_node_id;
 
-  Network();
 
-  void build_network(vector<int> &node_ids,string networkType);
+  // Static method to access the singleton instance.
+  static Network& getInstance();
+  // Delete copy constructor and assignment operator to prevent copies.
+  Network(const Network&) = delete;
+  Network& operator=(const Network&) = delete;
+
+  void build_network(vector<int> &node_ids,const string& networkType);
 };
 
 class Logger
