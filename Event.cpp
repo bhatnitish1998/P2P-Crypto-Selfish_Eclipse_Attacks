@@ -56,6 +56,19 @@ timer_expired_object::timer_expired_object(int node_id, const shared_ptr<Block>&
     this->blk = blk;
 }
 
+release_private_object::release_private_object(int node_id,int counter)
+{
+    this->node_id = node_id;
+    this->counter = counter;
+}
+
+ostream& operator<<(ostream& os, const release_private_object& obj)
+{
+    os << " Release private chain event: "<<endl;
+    os << " node_id: " << obj.node_id << endl;
+    return os;
+}
+
 ostream& operator<<(ostream& os, const timer_expired_object& obj)
 {
     os << " Timer expired event: "<<endl;

@@ -47,6 +47,7 @@ def load_blockchain_graph_from_file(filepath):
             edges.append((parent_id, block_id))
 
         node_mining_data[block_id] = mined_by
+    edges.sort()
     graph.add_edges_from(edges)
     # print(filepath,node_mining_data)
     

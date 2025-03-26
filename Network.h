@@ -37,6 +37,7 @@ extern EQ event_queue;
 extern bool eclipse_attack;
 extern bool selfish_mining;
 extern int maximum_retries;
+extern int global_send_private_counter;
 
 // Link between two nodes
 class Link
@@ -51,6 +52,7 @@ public:
   set<long long> blocks_sent;
   set<long long> get_message_sent;
   set<long long> hash_sent;
+  set<int> release_private_sent;
 
   Link(int peer, int propagation_delay, long long link_speed);
 };
@@ -114,6 +116,8 @@ public:
   // send block to requester
   void send_block(const get_block_request_object &obj);
   long long compute_hash(shared_ptr<Block> blk);
+  void release_private(int counter);
+  void release_private_helper(shared_ptr<Block> blk);
 };
 
 

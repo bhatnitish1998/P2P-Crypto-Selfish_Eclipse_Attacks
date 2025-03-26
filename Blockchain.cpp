@@ -16,11 +16,12 @@ Transaction::Transaction(const int receiver, const int amount, const bool coinba
     if (coinbase && sender != -1) throw invalid_argument("sender present for coinbase transaction");
 }
 
-Block::Block(const long long creation_time,  shared_ptr<Block> parent_block,bool is_honest)
+Block::Block(const long long creation_time,  shared_ptr<Block> parent_block,bool is_private,bool is_honest)
 {
     id = block_ticket++;
     this->parent_block = std::move(parent_block);
     this->creation_time = creation_time;
+    this->is_private = is_private;
     this->is_honest = is_honest;
 }
 
@@ -37,9 +38,10 @@ bool CompareLeafNodePtr::operator()(const std::shared_ptr<LeafNode>& a, const st
     else return a->length > b->length;
 }
 
-Timer::Timer(shared_ptr<Block> blk)
+Timer::Timer(shared_ptr<Block> blk,bool is_running)
 {
     this->blk = std::move(blk);
+    this->is_running = is_running;
 }
 
 ostream& operator<<(ostream& os, const Transaction& txn)

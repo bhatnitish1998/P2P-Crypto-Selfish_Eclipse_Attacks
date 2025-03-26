@@ -22,7 +22,7 @@ int transaction_size = 1024 * 8;
 int hash_size = 64*8;
 int get_message_size = 64*8;
 int mining_reward = 50;
-int maximum_retries = 10;
+int maximum_retries = 10000;
 
 // experiment parameters
 int number_of_nodes;
@@ -38,6 +38,7 @@ unsigned int global_seed = 911;
 Logger l;
 bool selfish_mining = true;
 bool eclipse_attack = true;
+int global_send_private_counter =0;
 
 
 int main(int argc, char* argv[])

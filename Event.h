@@ -13,6 +13,7 @@
 #define RECEIVE_HASH 4
 #define GET_BLOCK_REQUEST 5
 #define TIMER_EXPIRED 6
+#define RELEASE_PRIVATE 7
 
 #include <variant>
 #include <queue>
@@ -84,9 +85,18 @@ struct timer_expired_object
     friend ostream& operator<<(ostream& os, const timer_expired_object& obj);
 };
 
+struct release_private_object
+{
+    int node_id;
+    int counter;
+
+    release_private_object(int node_id,int counter);
+    friend ostream& operator<<(ostream& os, const release_private_object& obj);
+};
+
 
 typedef variant<create_transaction_object, receive_transaction_object, receive_block_object, block_mined_object, receive_hash_object
-,get_block_request_object,timer_expired_object> VO;
+,get_block_request_object,timer_expired_object, release_private_object> VO;
 
 class Event
 {

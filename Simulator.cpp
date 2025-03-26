@@ -6,7 +6,7 @@
 
 void Simulator::create_genesis()
 {
-    auto genesis = make_shared<Block>(0, nullptr,true);
+    auto genesis = make_shared<Block>(0, nullptr,false,true);
     // create coinbase transaction for each node with initial bitcoin
     for (int i = 0; i < number_of_nodes; i++)
     {
@@ -134,6 +134,12 @@ void Simulator::start()
         {
             const auto obj = std::get<struct timer_expired_object>(e.object);
             network.nodes[obj.node_id].timer_expired(obj);
+        }
+
+        else if (e.type == RELEASE_PRIVATE)
+        {
+            const auto obj = std::get<struct release_private_object>(e.object);
+            network.nodes[obj.node_id].release_private(obj.counter);
         }
     }
     cout << " Simulation completed, Writing stats to files" << endl;

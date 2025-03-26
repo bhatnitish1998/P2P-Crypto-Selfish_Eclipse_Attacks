@@ -29,7 +29,6 @@ Node::Node()
     blocks_received = 0;
 }
 
-
 void Node::create_transaction()
 {
     // randomly choose amount and receiver
@@ -48,7 +47,6 @@ void Node::create_transaction()
     // if free start mining
     if ( !currently_mining) mine_block();
 }
-
 
 void Node::send_transaction_to_link(const shared_ptr<Transaction>& txn, Link& link) const
 {
@@ -95,7 +93,6 @@ void Node::send_get_to_link(const shared_ptr<Block>& blk, Link &link) const
     event_queue.emplace(simulation_time + latency,GET_BLOCK_REQUEST,gobj);
 }
 
-
 void Node::receive_hash(const receive_hash_object &obj)
 {
     if (block_ids_in_tree.count(obj.blk->id) == 1)
@@ -105,18 +102,32 @@ void Node::receive_hash(const receive_hash_object &obj)
     {
         hashes_seen.insert(obj.blk->id);
 
-        // Generate get block request event
-        for ( auto& link: peers)
+        Link to_send_link(1,1,1);
+        Network& network = Network::getInstance();
+        // if attacker overlay exists send through that
+        if (malicious && network.nodes[obj.sender_node_id].malicious)
         {
-            if (link.peer == obj.sender_node_id)
-            {
-                send_get_to_link(obj.blk,link);
-                break;
-            }
+            for (const auto& link: malicious_peers)
+                if (link.peer == obj.sender_node_id)
+                {
+                    to_send_link = link;
+                    break;
+                }
+        }
+        else
+        {
+            for (const auto& link: peers)
+                if (link.peer == obj.sender_node_id)
+                {
+                    to_send_link = link;
+                    break;
+                }
         }
 
+        send_get_to_link(obj.blk,to_send_link);
+
         // Add timer
-        Timer t(obj.blk);
+        Timer t(obj.blk,true);
         t.tried_senders.insert(obj.sender_node_id);
         timers.emplace(obj.blk->id,t);
 
@@ -129,16 +140,26 @@ void Node::receive_hash(const receive_hash_object &obj)
         if (auto it = timers.find(obj.blk->id); it != timers.end())
         {
             it->second.available_senders.push(obj.sender_node_id);
+
+            if (  !it->second.is_running)
+            {
+                timer_expired_object tobj(id,obj.blk);
+                event_queue.emplace(simulation_time+ timer_timeout_time, TIMER_EXPIRED,tobj);
+
+            }
         }
     }
 }
-
 
 void Node::timer_expired(const timer_expired_object& obj)
 {
     auto it = timers.find(obj.blk->id);
     if (it == timers.end()) return;
-    if (it->second.available_senders.empty()) return;
+    if (it->second.available_senders.empty())
+    {
+        it->second.is_running = false;
+        return;
+    }
 
     // send to the next available
     int next_sender = it->second.available_senders.front();
@@ -151,16 +172,30 @@ void Node::timer_expired(const timer_expired_object& obj)
 
     // send get request to next sender
     it->second.tried_senders.insert(next_sender);
-    for ( auto& link: peers)
-    {
-        if (link.peer == next_sender)
-        {
-            send_get_to_link(obj.blk,link);
-            break;
-        }
-    }
-}
 
+    Link to_send_link(1,1,1);
+    Network& network = Network::getInstance();
+    // if attacker overlay exists send through that
+    if (malicious && network.nodes[next_sender].malicious)
+    {
+        for (const auto& link: malicious_peers)
+            if (link.peer ==next_sender)
+            {
+                to_send_link = link;
+                break;
+            }
+    }
+    else
+    {
+        for (const auto& link: peers)
+            if (link.peer == next_sender)
+            {
+                to_send_link = link;
+                break;
+            }
+    }
+    send_get_to_link(obj.blk,to_send_link);
+}
 
 void Node::receive_block(const receive_block_object& obj)
 {
@@ -176,19 +211,39 @@ void Node::receive_block(const receive_block_object& obj)
     {
         if (obj.tries > maximum_retries)
             return;
+
         l.log <<"Time "<< simulation_time << ": Node " << id << " NACK block  "<<obj.blk->id<<endl;
         // simulate resending the block by the peer (assume ACK, NACK mechanism)
-        for (const auto& link: peers)
+
+
+        Link to_send_link(1,1,1);
+        Network& network = Network::getInstance();
+        // if attacker overlay exists send through that
+        if (malicious && network.nodes[obj.sender_node_id].malicious)
         {
-            if (link.peer == obj.sender_node_id)
-            {
-                const long long size = transaction_size * static_cast<long long>(obj.blk->transactions.size());
-                const long long latency = link.propagation_delay + size/link.link_speed + \
-                exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
-                Event e(simulation_time + latency,RECEIVE_BLOCK,receive_block_object(obj.sender_node_id,obj.receiver_node_id,obj.blk,obj.tries+1));
-                event_queue.push(e);
-            }
+            for (const auto& link: malicious_peers)
+                if (link.peer == obj.sender_node_id)
+                {
+                    to_send_link = link;
+                    break;
+                }
         }
+        else
+        {
+            for (const auto& link: peers)
+                if (link.peer == obj.sender_node_id)
+                {
+                    to_send_link = link;
+                    break;
+                }
+        }
+
+        const long long size = transaction_size * static_cast<long long>(obj.blk->transactions.size());
+        const long long latency = to_send_link.propagation_delay + size/to_send_link.link_speed + \
+        exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(to_send_link.link_speed));
+        Event e(simulation_time + latency,RECEIVE_BLOCK,receive_block_object(obj.sender_node_id,obj.receiver_node_id,obj.blk,obj.tries+1));
+        event_queue.push(e);
+
         return;
     }
 
@@ -201,7 +256,34 @@ void Node::receive_block(const receive_block_object& obj)
         auto it = timers.find(obj.blk->id);
         if (it != timers.end()) timers.erase(it);
 
-        mine_block();
+
+        if (!malicious)
+        {
+            mine_block();
+            return;
+        }
+
+        if (selfish_mining && ringmaster && obj.blk->is_private)
+        {
+            mine_block();
+            return;
+        }
+
+        if (selfish_mining && ringmaster && !obj.blk->is_private)
+        {
+            long long global_length = (*leaves.begin())->length;
+            long long private_length = private_leaf==nullptr? 0 : private_leaf->length;
+
+            printf("Global : %lld Private %lld Generated by %d  block id : %lld parend id: %lld \n",global_length,private_length,(*obj.blk->transactions.begin())->receiver, obj.blk->id,obj.blk->parent_block->id);
+
+            if (global_length == private_length -1 || global_length == private_length)
+            {
+                global_send_private_counter++;
+                release_private(global_send_private_counter);
+                printf("released private chain \n");
+                mine_block();
+            }
+        }
     }
 }
 
@@ -214,13 +296,11 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
             [&blk](const shared_ptr<LeafNode>& leaf){return blk->parent_block->id == leaf->block->id;});
 
 
-
-    if (selfish_mining && malicious && private_leaf != nullptr && !blk->is_honest )
+    if (selfish_mining && malicious && private_leaf != nullptr && blk->is_private )
     {
         temp_balance = private_leaf->balance;
         temp_transaction_ids = private_leaf->transaction_ids;
         temp_length = private_leaf->length+1;
-
     }
     else
     {
@@ -278,21 +358,31 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
 
     // if validated broadcast block and insert into tree.
     broadcast_hash(blk);
-    block_ids_in_tree.insert({blk->id,simulation_time});
+
+    if (malicious || !blk->is_private)
+        block_ids_in_tree.insert({blk->id,simulation_time});
 
     l.log << "Time "<< simulation_time <<": Node " << id << " successfully validated block  "<<blk->id<<endl;
 
-    // Update the leaf nodes
+    // Create leaf node
     const auto temp_leaf = make_shared<LeafNode>(blk,temp_length);
     temp_leaf->balance= std::move(temp_balance);
     temp_leaf->transaction_ids = std::move(temp_transaction_ids);
 
 
-    if ( selfish_mining && malicious && !blk->is_honest)
+    if ( selfish_mining && malicious && blk->is_private)
     {
+
         private_leaf = temp_leaf;
+
+        long long global_length = (*leaves.begin())->length;
+        long long private_length = private_leaf==nullptr? 0 : private_leaf->length;
+
+        printf("Global : %lld Private %lld Generated by %d  block id : %lld parent id: %lld \n",global_length,private_length,(*blk->transactions.begin())->receiver,blk->id,blk->parent_block->id);
         return true;
+
     }
+
     else
     {
         // return true if longest changes after inserting
@@ -304,29 +394,47 @@ bool Node::validate_and_add_block(shared_ptr<Block> blk)
 
         return (previous_longest != current_longest);
     }
-
 }
 
 void Node::broadcast_hash(const shared_ptr<Block>& blk)
 {
-    vector<Link> peers_to_send = peers;
-    if (selfish_mining && malicious && !blk->is_honest)
-        peers_to_send = malicious_peers;
-
-    for (auto link : peers_to_send)
+    if (malicious)
     {
-        // send hash if not already sent to the peer
-        if (link.hash_sent.count(blk->id) == 0)
+        for (auto link : malicious_peers)
         {
-            link.hash_sent.insert(blk->id);
-            const long long latency = link.propagation_delay + hash_size/link.link_speed + \
-            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+            // send hash if not already sent to the peer
+            if (link.hash_sent.count(blk->id) == 0)
+            {
+                link.hash_sent.insert(blk->id);
+                const long long latency = link.propagation_delay + hash_size/link.link_speed + \
+                exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
 
-            // create receive hash event for that node at current time + latency
-            long long hash_value = compute_hash(blk);
-            receive_hash_object obj(hash_value,id,link.peer,blk);
-            Event e(simulation_time + latency,RECEIVE_HASH,obj);
-            event_queue.push(e);
+                // create receive hash event for that node at current time + latency
+                long long hash_value = compute_hash(blk);
+                receive_hash_object obj(hash_value,id,link.peer,blk);
+                Event e(simulation_time + latency,RECEIVE_HASH,obj);
+                event_queue.push(e);
+            }
+        }
+    }
+
+    if (!blk->is_private)
+    {
+        for (auto link : peers)
+        {
+            // send hash if not already sent to the peer
+            if (link.hash_sent.count(blk->id) == 0)
+            {
+                link.hash_sent.insert(blk->id);
+                const long long latency = link.propagation_delay + hash_size/link.link_speed + \
+                exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+
+                // create receive hash event for that node at current time + latency
+                long long hash_value = compute_hash(blk);
+                receive_hash_object obj(hash_value,id,link.peer,blk);
+                Event e(simulation_time + latency,RECEIVE_HASH,obj);
+                event_queue.push(e);
+            }
         }
     }
 }
@@ -342,12 +450,12 @@ void Node::mine_block()
     // create the new block with coinbase transaction
     shared_ptr<LeafNode> longest_leaf = *leaves.begin();
 
-    if (selfish_mining && malicious && private_leaf!= nullptr)
+    if (selfish_mining && ringmaster && private_leaf!= nullptr)
     {
         longest_leaf = private_leaf;
     }
 
-    auto blk = make_shared<Block>(simulation_time,longest_leaf->block,!malicious);
+    auto blk = make_shared<Block>(simulation_time,longest_leaf->block,ringmaster,!ringmaster);
     blk->transactions.push_back(make_shared<Transaction>(id,mining_reward,true));
     vector<long long > temp_balance = longest_leaf->balance;
 
@@ -386,17 +494,11 @@ void Node::mine_block()
     event_queue.emplace(simulation_time + mining_time,BLOCK_MINED, obj);
 }
 
-
 void Node::complete_mining(const shared_ptr<Block>&  blk)
 {
     shared_ptr<LeafNode> longest_leaf = *leaves.begin();
 
-    if (selfish_mining && malicious && private_leaf!= nullptr && !blk->is_honest)
-    {
-        longest_leaf = private_leaf;
-    }
-    // if longest chain has not changed while mining
-    if (blk->parent_block->id == longest_leaf->block->id)
+    if (selfish_mining && ringmaster && private_leaf!= nullptr || blk->parent_block->id == longest_leaf->block->id)
     {
         // validation always succeeds
         validate_and_add_block(blk);
@@ -422,44 +524,79 @@ void Node::complete_mining(const shared_ptr<Block>&  blk)
 
 void Node::send_block(const get_block_request_object &obj){
 
-    // Network& network = Network::getInstance();
-    // if (eclipse_attack && malicious && !network.nodes[obj.sender_node_id].malicious && obj.blk->is_honest)
-    //     return;
-    //
+    Network& network = Network::getInstance();
     const long long size = (transaction_size) * static_cast<long long>(obj.blk->transactions.size());
-    //
-    // // if attacker overlay exists send through that
-    vector<Link> to_send_peers = peers;
-    // if (malicious && network.nodes[obj.sender_node_id].malicious)
-    // {
-    //     for (const auto& link : malicious_peers)
-    //       if (link.peer == obj.sender_node_id)
-    //           to_send_peers = malicious_peers;
-    // }
 
-    for (auto link : to_send_peers)
+
+    Link to_send_link(1,1,1);
+    // if attacker overlay exists send through that
+    if (malicious && network.nodes[obj.sender_node_id].malicious)
     {
-        if (link.peer == obj.sender_node_id)
-        {
-            if (link.blocks_sent.count(obj.blk->id) == 0)
+        for (const auto& link: malicious_peers)
+            if (link.peer == obj.sender_node_id)
             {
-                link.blocks_sent.insert(obj.blk->id);
-                const long long latency = link.propagation_delay + size/link.link_speed + \
-                exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
-
-                // create receive block event for that node at current time + latency
-                receive_block_object robj(id,link.peer,obj.blk,0);
-                Event e(simulation_time + latency,RECEIVE_BLOCK,robj);
-                event_queue.push(e);
+                to_send_link = link;
+                break;
             }
-        }
     }
+    else
+    {
+        for (const auto& link: peers)
+            if (link.peer == obj.sender_node_id)
+            {
+                to_send_link = link;
+                break;
+            }
+    }
+        const long long latency = to_send_link.propagation_delay + size/to_send_link.link_speed + \
+        exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(to_send_link.link_speed));
+
+        // create receive block event for that node at current time + latency
+        receive_block_object robj(id,to_send_link.peer,obj.blk,0);
+        Event e(simulation_time + latency,RECEIVE_BLOCK,robj);
+        event_queue.push(e);
 }
 
 long long Node::compute_hash(shared_ptr<Block> blk)
 {
     //TODO: Compute actual hash and return
     return blk->id;
+}
+
+void Node::release_private_helper(shared_ptr<Block> blk)
+{
+    if ( blk == nullptr)
+        return;
+    release_private_helper(blk->parent_block);
+
+    blk->is_private = false;
+    broadcast_hash(blk);
+}
+
+void Node::release_private(int counter)
+{
+    if (private_leaf == nullptr)
+        return;
+
+    for (auto link : malicious_peers)
+    {
+        // send hash if not already sent to the peer
+        if (link.release_private_sent.count(counter) == 0)
+        {
+            link.release_private_sent.insert(counter);
+
+            const long long latency = link.propagation_delay + get_message_size/link.link_speed + \
+            exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(link.link_speed));
+
+            // create receive hash event for that node at current time + latency
+            release_private_object obj(link.peer,counter);
+            Event e(simulation_time + latency,RELEASE_PRIVATE,obj);
+            event_queue.push(e);
+        }
+    }
+    release_private_helper(private_leaf->block);
+    leaves.insert(private_leaf);
+    private_leaf = nullptr;
 }
 
 

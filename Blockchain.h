@@ -38,9 +38,10 @@ public:
     shared_ptr<Block> parent_block;
     vector<shared_ptr<Transaction>> transactions;
     long long creation_time;
+    bool is_private;
     bool is_honest;
 
-    Block(long long creation_time, shared_ptr<Block> parent_block, bool is_honest);
+    Block(long long creation_time, shared_ptr<Block> parent_block, bool is_private, bool is_honest);
     friend ostream& operator<<(ostream& os, const Block& block);
 };
 
@@ -63,8 +64,9 @@ class Timer {
     shared_ptr<Block> blk;
     queue<int> available_senders;
     set<int> tried_senders;
+    bool is_running;
 
-    Timer(shared_ptr<Block> blk);
+    Timer(shared_ptr<Block> blk, bool is_runninng);
 };
 
 // comparator to sort  LeafNode pointers by length of leaf node
