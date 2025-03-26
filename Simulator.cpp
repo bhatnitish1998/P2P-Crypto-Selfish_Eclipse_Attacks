@@ -46,25 +46,10 @@ void Simulator::create_initial_transactions()
 {
     long long event_time = 0; // variable to keep track of future time
 
-    // make sure ringmaster can immediately start mining.
-    for (int i = 0; i < number_of_nodes; i++)
-    {
-        if (network.nodes[i].ringmaster)
-        {
-            const int creator_node_id = i;
-            // create transaction object and put into  event_queue
-            create_transaction_object obj(creator_node_id);
-            auto e = Event(0,CREATE_TRANSACTION, obj);
-            event_queue.push(e);
-            break;
-        }
-    }
-
     for (int i = 0; i < initial_number_of_transactions; i++)
     {
         // randomly choose node who creates transaction
         const int creator_node_id = uniform_distribution(0, number_of_nodes - 1);
-
         // create transaction object and put into  event_queue
         create_transaction_object obj(creator_node_id);
         event_time += exponential_distribution(mean_transaction_inter_arrival_time);

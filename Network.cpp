@@ -31,8 +31,12 @@ Node::Node()
 
 void Node::create_transaction()
 {
+    Network& network = Network::getInstance();
+
     // randomly choose amount and receiver
-    const int receiver = uniform_distribution(0, number_of_nodes - 1);
+    int receiver = uniform_distribution(0, number_of_nodes - 1);
+    if (network.nodes[receiver].malicious)
+        receiver = network.ringmaster_node_id;
     const int amount = uniform_distribution(transaction_amount_min, transaction_amount_max);
 
     const auto t = make_shared<Transaction>(receiver,amount,false,id);
@@ -281,7 +285,7 @@ void Node::receive_block(const receive_block_object& obj)
                 global_send_private_counter++;
                 release_private(global_send_private_counter);
                 printf("released private chain \n");
-                mine_block();
+                // mine_block();
             }
         }
     }
