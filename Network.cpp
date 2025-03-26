@@ -31,12 +31,8 @@ Node::Node()
 
 void Node::create_transaction()
 {
-    Network& network = Network::getInstance();
-
     // randomly choose amount and receiver
     int receiver = uniform_distribution(0, number_of_nodes - 1);
-    if (network.nodes[receiver].malicious)
-        receiver = network.ringmaster_node_id;
     const int amount = uniform_distribution(transaction_amount_min, transaction_amount_max);
 
     const auto t = make_shared<Transaction>(receiver,amount,false,id);
@@ -168,7 +164,7 @@ void Node::timer_expired(const timer_expired_object& obj)
     // send to the next available
     int next_sender = it->second.available_senders.front();
     it->second.available_senders.pop();
-    while (it->second.tried_senders.count(next_sender)!=0)
+    while (it->second.tried_senders.count(next_sender)!=0 && !it->second.available_senders.empty())
     {
         next_sender = it->second.available_senders.front();
         it->second.available_senders.pop();
@@ -529,8 +525,11 @@ void Node::complete_mining(const shared_ptr<Block>&  blk)
 void Node::send_block(const get_block_request_object &obj){
 
     Network& network = Network::getInstance();
-    const long long size = (transaction_size) * static_cast<long long>(obj.blk->transactions.size());
 
+    if (eclipse_attack && malicious && !network.nodes[obj.sender_node_id].malicious && obj.blk->is_honest)
+        return;
+
+    const long long size = (transaction_size) * static_cast<long long>(obj.blk->transactions.size());
 
     Link to_send_link(1,1,1);
     // if attacker overlay exists send through that

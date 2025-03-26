@@ -10,7 +10,7 @@
 
 // experiment constants
 int initial_bitcoin = 1000;
-int initial_number_of_transactions = 5000;
+int initial_number_of_transactions = 3000;
 int propagation_delay_min = 10;
 int propagation_delay_max = 500;
 int propagation_delay_malicious_min = 1;
@@ -22,7 +22,7 @@ int transaction_size = 1024 * 8;
 int hash_size = 64*8;
 int get_message_size = 64*8;
 int mining_reward = 50;
-int maximum_retries = 10000;
+int maximum_retries = 100;
 
 // experiment parameters
 int number_of_nodes;

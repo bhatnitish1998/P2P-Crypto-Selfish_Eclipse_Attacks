@@ -45,11 +45,12 @@ void Simulator::create_genesis()
 void Simulator::create_initial_transactions()
 {
     long long event_time = 0; // variable to keep track of future time
-
     for (int i = 0; i < initial_number_of_transactions; i++)
     {
         // randomly choose node who creates transaction
-        const int creator_node_id = uniform_distribution(0, number_of_nodes - 1);
+        int creator_node_id = uniform_distribution(0, number_of_nodes - 1);
+        if (network.nodes[creator_node_id].malicious)
+            creator_node_id = network.ringmaster_node_id;
         // create transaction object and put into  event_queue
         create_transaction_object obj(creator_node_id);
         event_time += exponential_distribution(mean_transaction_inter_arrival_time);
