@@ -4,6 +4,9 @@ from collections import defaultdict,deque
 import os
 import glob
 import matplotlib.patches as mpatches
+import matplotlib
+
+matplotlib.use('agg')
 
 def initialize_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
