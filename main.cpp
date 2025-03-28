@@ -10,7 +10,7 @@
 
 // experiment constants
 int initial_bitcoin = 1000;
-int initial_number_of_transactions = 3000;
+int initial_number_of_transactions = 4000;
 int propagation_delay_min = 10;
 int propagation_delay_max = 500;
 int propagation_delay_malicious_min = 1;
@@ -37,13 +37,13 @@ EQ event_queue;
 unsigned int global_seed = 911;
 Logger l;
 bool selfish_mining = true;
-bool eclipse_attack = true;
+bool eclipse_attack = false;
 int global_send_private_counter =0;
 
 
 int main(int argc, char* argv[])
 {
-    if (argc != 6)
+    if (argc < 6 || argc > 7)
     {
         cerr << "Usage: " << argv[0] <<
             " <number_of_nodes> <percent_malicious> <mean_transaction_inter_arrival_time> <block_inter_arrival_time> <timeout time>"
@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
         cerr << "  mean_transaction_inter_arrival_time: milli-seconds" << endl;
         cerr << "  block_inter_arrival_time: seconds" << endl;
         cerr << "  timeout time: milli-seconds" << endl;
+        cerr << "  [--eclipse]: optional argument to enable eclipse attack" << endl;
         return 1;
     }
 
@@ -60,6 +61,8 @@ int main(int argc, char* argv[])
     block_inter_arrival_time = stoi(argv[4])* 1000 ;
     timer_timeout_time = stoi(argv[5]);
 
+    if (argc == 7 && string(argv[6]) == "--eclipse")
+        eclipse_attack = true;
 
     if (number_of_nodes < 1 ||  percent_malicious_nodes < 0 || percent_malicious_nodes > 100
         || mean_transaction_inter_arrival_time <= 0 || block_inter_arrival_time <= 0 || timer_timeout_time <= 0)
@@ -89,6 +92,8 @@ int main(int argc, char* argv[])
     cout << "  Initial Number of Transactions: " << initial_number_of_transactions << endl;
     cout << "  Transaction Amount (Min-Max): " << transaction_amount_min << " - " << transaction_amount_max <<
         " bitcoins" << endl;
+    cout << "  Eclipse Attack: " << (eclipse_attack ? "Enabled" : "Disabled") << endl;
+    cout << "  Selfish Mining: " << (selfish_mining ? "Enabled" : "Disabled") << endl;
     cout << "----------------------------------------------------------------------" << endl;
     srand(global_seed);
 
