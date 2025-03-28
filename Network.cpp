@@ -279,8 +279,9 @@ void Node::receive_block(const receive_block_object& obj)
             if (global_length == private_length -1 || global_length == private_length)
             {
                 global_send_private_counter++;
+                long long private_leaf_id = private_leaf == nullptr? -1 : private_leaf->block->id;
                 release_private(global_send_private_counter);
-                printf("released private chain \n");
+                printf("released private chain, private_leaf: %lld  honest_block: %lld \n", private_leaf_id, obj.blk->id);
                 // mine_block();
             }
         }
