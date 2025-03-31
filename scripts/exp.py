@@ -54,12 +54,12 @@ def main():
 
     """------------------- Set params here ------------------------"""
     # Define parameter ranges
-    number_of_nodes_list                = [10]
-    percent_malicious_list              = [50,60,70]  
-    mean_transaction_inter_arrival_list = [1000]
-    block_inter_arrival_list            = [100]
-    timeout_time_list                   = [500, 1500, 2000]
-    eclipse_attack_list                 = [False, True]
+    number_of_nodes_list                = [50]
+    percent_malicious_list              = [5,10,20,40,60]  
+    mean_transaction_inter_arrival_list = [50]
+    block_inter_arrival_list            = [600]
+    timeout_time_list                   = [50,500,1000,1500,3000]
+    eclipse_attack_list                 = [False]
     """--------------------------------------------------------------"""
 
     project_root = os.getcwd()
@@ -82,6 +82,7 @@ def main():
         writer.writerow(["number_of_nodes", "percent_malicious", "mean_transaction_inter_arrival", "block_inter_arrival", "timeout", "is_eclipse", "ratio_1", "ratio_2"])
     
         combinations_param_list = [
+        eclipse_attack_list,
         number_of_nodes_list,
         percent_malicious_list,
         mean_transaction_inter_arrival_list,
@@ -114,7 +115,7 @@ def main():
         if eclipse_attack:
             cmd.append("--eclipse")
         # cmd.append(f" > {experiment_subfolder}/exp_stdout.log")
-        print(f"\nExecuting: {' '.join(cmd)}")
+        # print(f"\nExecuting: {' '.join(cmd)}")
         process = subprocess.run(cmd, capture_output=True, text=True)
         # print("stdout:\n", process.stdout)
         # print("stderr:\n", process.stderr)
@@ -140,6 +141,10 @@ def main():
             writer.writerow([number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout, eclipse_attack, round(ratio_1, 4), round(ratio_2, 4)])
     
     print(f"Results saved to {results_file_path}")
+
+    plot_script = './scripts/plot.py'
+    subprocess.run(['python3', plot_script, results_file_path])
+    # print(f'Plots saved at: {results_file_path}/plot.py')
     
 if __name__ == "__main__":
     main()

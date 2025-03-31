@@ -432,6 +432,7 @@ void Node::broadcast_hash(const shared_ptr<Block>& blk)
 
                 // create receive hash event for that node at current time + latency
                 long long hash_value = compute_hash(blk);
+                // cout<<"hash value :"<<hash_value <<"Block id :"<<blk->id<<endl;
                 receive_hash_object obj(hash_value,id,link.peer,blk);
                 Event e(simulation_time + latency,RECEIVE_HASH,obj);
                 event_queue.push(e);
@@ -564,6 +565,21 @@ void Node::send_block(const get_block_request_object &obj){
 long long Node::compute_hash(shared_ptr<Block> blk)
 {
     //TODO: Compute actual hash and return
+    // stringstream ss;
+    // ss << blk->id << "-" 
+    //    << (blk->parent_block ? blk->parent_block->id : 0) << "-"
+    //    << blk->creation_time << "-"
+    //    << blk->is_private << "-"
+    //    << blk->is_honest;
+    
+    // string hash_str = md5(ss.str());
+    
+    // long long hash_val = 0;
+    // for (size_t i = 0; i < 16 && i < hash_str.size(); i++) {
+    //     hash_val = (hash_val << 4) | (hash_str[i] % 16);
+    // }
+   
+    // return hash_val;
     return blk->id;
 }
 
