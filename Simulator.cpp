@@ -44,18 +44,26 @@ void Simulator::create_genesis()
 // Populate the event queue with initial transactions
 void Simulator::create_initial_transactions()
 {
+
     long long event_time = 0; // variable to keep track of future time
+
+    create_transaction_object obj(network.ringmaster_node_id);
+    auto e = Event(0,CREATE_TRANSACTION, obj);
+    event_queue.push(e);
+
     for (int i = 0; i < initial_number_of_transactions; i++)
     {
         // randomly choose node who creates transaction
         int creator_node_id = uniform_distribution(0, number_of_nodes - 1);
-        if (network.nodes[creator_node_id].malicious)
-            creator_node_id = network.ringmaster_node_id;
         // create transaction object and put into  event_queue
         create_transaction_object obj(creator_node_id);
         event_time += exponential_distribution(mean_transaction_inter_arrival_time);
         auto e = Event(event_time,CREATE_TRANSACTION, obj);
         event_queue.push(e);
+
+        create_transaction_object objr(network.ringmaster_node_id);
+        event_time += exponential_distribution(mean_transaction_inter_arrival_time);
+        auto er = Event(event_time,CREATE_TRANSACTION, objr);
     }
     cout << " Initialized event queue with " << initial_number_of_transactions << " transactions" << endl;
 }

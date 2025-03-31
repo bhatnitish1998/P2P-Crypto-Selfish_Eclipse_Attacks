@@ -10,7 +10,7 @@
 
 // experiment constants
 int initial_bitcoin = 1000;
-int initial_number_of_transactions = 4000;
+int initial_number_of_transactions = 5000;
 int propagation_delay_min = 10;
 int propagation_delay_max = 500;
 int propagation_delay_malicious_min = 1;
