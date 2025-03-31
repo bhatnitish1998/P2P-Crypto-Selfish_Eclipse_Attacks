@@ -89,12 +89,12 @@ def main():
     """ Run as: python scripts/exp.py and relax!"""
     
     """------------------- Set params here ------------------------"""
-    number_of_nodes_list = [10]
-    percent_malicious_list = [50, 60]  
+    number_of_nodes_list                = [10]
+    percent_malicious_list              = [20, 30, 50, 60]  
     mean_transaction_inter_arrival_list = [1000]
-    block_inter_arrival_list = [100]
-    timeout_time_list = [500, 1500]
-    eclipse_attack_list = [False, True]
+    block_inter_arrival_list            = [100]
+    timeout_time_list                   = [500, 1000, 1500]
+    eclipse_attack_list                 = [False, True]
     """--------------------------------------------------------------"""
     
     project_root = os.getcwd()
