@@ -93,8 +93,8 @@ def main():
     percent_malicious_list = [10,20,30,40,50]
     mean_transaction_inter_arrival_list = [100]
     block_inter_arrival_list = [20]
-    timeout_time_list = [500,5000,10000,15000]
-    eclipse_attack_list = [False]
+    timeout_time_list = [500,10000,15000]
+    eclipse_attack_list = [False,True]
     """--------------------------------------------------------------"""
     
     project_root = os.getcwd()

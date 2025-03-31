@@ -13,10 +13,10 @@ def initialize_path():
     project_root = os.path.dirname(script_dir) 
 
     # Create paths relative to the script directory
-    input_folder = os.path.join(project_root, "Output/Node_Files")
+    input_folder = os.path.join(project_root, "output/Node_Files")
     # create graph for each node
     input_files = glob.glob(os.path.join(input_folder, "Node_*.txt"))
-    output_folder = os.path.join(project_root, "Output/Blockchains")
+    output_folder = os.path.join(project_root, "output/Blockchains")
     return input_files,output_folder
 
 def load_blockchain_graph_from_file(filepath):

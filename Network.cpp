@@ -245,41 +245,8 @@ void Node::receive_block(const receive_block_object& obj)
     // if block received before parent
     if (block_ids_in_tree.count(obj.blk->parent_block->id) == 0)
     {
-        if (obj.tries > maximum_retries)
-            return;
-
-        l.log <<"Time "<< simulation_time << ": Node " << id << " NACK block  "<<obj.blk->id<<endl;
-        // simulate resending the block by the peer (assume ACK, NACK mechanism)
-
-
-        Link to_send_link(1,1,1);
-        Network& network = Network::getInstance();
-        // if attacker overlay exists send through that
-        if (malicious && network.nodes[obj.sender_node_id].malicious)
-        {
-            for (const auto& link: malicious_peers)
-                if (link.peer == obj.sender_node_id)
-                {
-                    to_send_link = link;
-                    break;
-                }
-        }
-        else
-        {
-            for (const auto& link: peers)
-                if (link.peer == obj.sender_node_id)
-                {
-                    to_send_link = link;
-                    break;
-                }
-        }
-
-        const long long size = transaction_size * static_cast<long long>(obj.blk->transactions.size());
-        const long long latency = to_send_link.propagation_delay + size/to_send_link.link_speed + \
-        exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(to_send_link.link_speed));
-        Event e(simulation_time + latency,RECEIVE_BLOCK,receive_block_object(obj.sender_node_id,obj.receiver_node_id,obj.blk,obj.tries+1));
-        event_queue.push(e);
-
+        l.log<< "Time "<< simulation_time <<": Node " << id << " added block "<<obj.blk->id<<" to local storage "<<endl;
+        local_storage.insert(obj.blk);
         return;
     }
 
@@ -320,6 +287,16 @@ void Node::receive_block(const receive_block_object& obj)
                 printf("released private chain, private_leaf: %lld  honest_block: %lld \n", private_leaf_id, obj.blk->id);
                 // mine_block();
             }
+        }
+    }
+
+    for (auto it = local_storage.begin(); it != local_storage.end(); ++it) {
+        if ((*it)->parent_block->id == obj.blk->id) {
+            l.log<< "Time "<< simulation_time <<": Node " << id << " retreived block "<<(*it)->id<<" from storage"<<endl;
+            receive_block_object robj(obj.sender_node_id,obj.receiver_node_id,*it);
+            receive_block(robj);
+            local_storage.erase(it);  // Erases the shared_ptr from the set.
+            break;
         }
     }
 }
@@ -593,7 +570,7 @@ void Node::send_block(const get_block_request_object &obj){
         exponential_distribution(static_cast<double>(queuing_delay_constant)/static_cast<double>(to_send_link.link_speed));
 
         // create receive block event for that node at current time + latency
-        receive_block_object robj(id,to_send_link.peer,obj.blk,0);
+        receive_block_object robj(id,to_send_link.peer,obj.blk);
         Event e(simulation_time + latency,RECEIVE_BLOCK,robj);
         event_queue.push(e);
 }

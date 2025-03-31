@@ -83,6 +83,7 @@ public:
   vector<Link> peers; // stores links to all its peers
   vector<Link> malicious_peers; // empty for honest
 
+  set<shared_ptr<Block>> local_storage;
   // Blockchain
   shared_ptr<Block> genesis; // genesis block pointer
   set<shared_ptr<LeafNode>,CompareLeafNodePtr> leaves; // stores information about all leaf nodes of blockchain tree

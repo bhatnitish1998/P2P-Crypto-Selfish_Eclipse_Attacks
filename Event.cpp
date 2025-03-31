@@ -20,12 +20,11 @@ receive_transaction_object::receive_transaction_object(const int sender_node_id,
 }
 
 receive_block_object::receive_block_object(const int sender_node_id, const int receiver_node_id,
-                                           const shared_ptr<Block>& blk,int tries)
+                                           const shared_ptr<Block>& blk)
 {
     this->sender_node_id = sender_node_id;
     this->receiver_node_id = receiver_node_id;
     this->blk = blk;
-    this->tries = tries;
 }
 
 block_mined_object::block_mined_object(const int miner_node_id, const shared_ptr<Block>& blk)

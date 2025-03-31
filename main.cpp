@@ -39,7 +39,7 @@ unsigned int global_seed = 911;
 Logger l;
 bool selfish_mining = true;
 bool eclipse_attack = false;
-bool mitigation = true;
+bool mitigation = false;
 int global_send_private_counter =0;
 
 
