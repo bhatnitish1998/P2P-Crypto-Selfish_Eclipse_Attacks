@@ -55,10 +55,10 @@ def main():
     """------------------- Set params here ------------------------"""
     # Define parameter ranges
     number_of_nodes_list                = [50]
-    percent_malicious_list              = [40,60]  
-    mean_transaction_inter_arrival_list = [50]
-    block_inter_arrival_list            = [600]
-    timeout_time_list                   = [1000,3000]
+    percent_malicious_list              = [10,20,30,40,50,60]
+    mean_transaction_inter_arrival_list = [100]
+    block_inter_arrival_list            = [200]
+    timeout_time_list                   = [1000,2000,3000,4000]
     eclipse_attack_list                 = [False]
     """--------------------------------------------------------------"""
 
@@ -88,6 +88,7 @@ def main():
         mean_transaction_inter_arrival_list,
         block_inter_arrival_list,
         timeout_time_list,
+        eclipse_attack_list,
     ]
         
     total_combinations = math.prod(map(len, combinations_param_list))
@@ -98,7 +99,7 @@ def main():
 
     for params in tqdm(exp_params, desc="Running experiments", unit="experiment", total=total_combinations):
         
-        eclipse_attack, number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout = params
+        number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout, eclipse_attack = params
         
         # Delete Output and Temp folder
         if os.path.exists(output_folder):
@@ -119,7 +120,7 @@ def main():
         # print("stdout:\n", process.stdout)
         # print("stderr:\n", process.stderr)
         
-        time.sleep(10)
+        time.sleep(3)
 
         # Parse results
         ringmaster_node = get_ringmaster_node(node_properties_filepath)

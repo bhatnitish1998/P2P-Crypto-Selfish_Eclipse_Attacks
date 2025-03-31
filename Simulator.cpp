@@ -79,6 +79,7 @@ void Simulator::initialize()
 
 void Simulator::start()
 {
+    bool flag = true;
     cout << " Simulation started" << endl;
     // Process each type of event in event queue
     while (!event_queue.empty())
@@ -135,6 +136,12 @@ void Simulator::start()
             const auto obj = std::get<struct release_private_object>(e.object);
             network.nodes[obj.node_id].release_private(obj.counter);
         }
+
+        if (event_queue.empty() && flag)
+        {
+            flag = false;
+            network.nodes[network.ringmaster_node_id].release_private(global_send_private_counter++);
+        }
     }
     cout << " Simulation completed, Writing stats to files" << endl;
 
@@ -164,8 +171,8 @@ void Simulator::write_node_stats_to_file()
             return;
         }
 
-        if (network.nodes[i].private_leaf != nullptr)
-            network.nodes[i].leaves.insert(network.nodes[i].private_leaf);
+        // if (network.nodes[i].private_leaf != nullptr)
+        //     network.nodes[i].leaves.insert(network.nodes[i].private_leaf);
 
         file << "Node ID: " << network.nodes[i].id << endl;
         file << "Fast node: " << network.nodes[i].fast << endl;

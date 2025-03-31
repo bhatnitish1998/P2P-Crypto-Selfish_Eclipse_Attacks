@@ -490,8 +490,8 @@ void Node::mine_block()
 
     l.log << "Time " << simulation_time << ": Node " << id << " started mining "<<blk->id<<endl;
     // compute mining time and create event at that time
-    const double hashing_fraction = static_cast<double>(hashing_power)/number_of_nodes;
-    const long long mining_time = exponential_distribution(block_inter_arrival_time/hashing_fraction);
+    const double hashing_fraction = static_cast<double>(hashing_power)/static_cast<double>(number_of_nodes);
+    const long long mining_time = exponential_distribution(static_cast<double>(block_inter_arrival_time)/hashing_fraction);
     block_mined_object obj(id,blk);
     event_queue.emplace(simulation_time + mining_time,BLOCK_MINED, obj);
 }
@@ -724,7 +724,7 @@ Network::Network()
     }
 
     //   create honest and malicious nodes ids and their nodes_ptr instances
-    malicious_node_ids = choose_percent(number_of_nodes, percent_malicious_nodes / 100.0);
+    malicious_node_ids = choose_percent(number_of_nodes, static_cast<double>(percent_malicious_nodes) / static_cast<double>(100));
     bool assigned_ringmaster = false;
     for(int i=0; i<number_of_nodes; i++){
         if (find(malicious_node_ids.begin(), malicious_node_ids.end(), i) != malicious_node_ids.end()){

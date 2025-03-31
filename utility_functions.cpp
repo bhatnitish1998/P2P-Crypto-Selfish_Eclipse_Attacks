@@ -237,18 +237,18 @@ void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
     adj_file.close();
 
 }
-
-//  Hash computation taken from MICA key-value store by Hyeontaek Lim
+//
+// //  Hash computation taken from MICA key-value store by Hyeontaek Lim
 // string md5(const string &data) {
 //     unsigned char digest[EVP_MAX_MD_SIZE];
 //     unsigned int digest_len;
-    
+//
 //     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
 //     EVP_DigestInit_ex(ctx, EVP_md5(), nullptr);
 //     EVP_DigestUpdate(ctx, data.c_str(), data.size());
 //     EVP_DigestFinal_ex(ctx, digest, &digest_len);
 //     EVP_MD_CTX_free(ctx);
-    
+//
 //     stringstream ss;
 //     for (unsigned int i = 0; i < digest_len; i++) {
 //         ss << hex << setw(2) << setfill('0') << (int)digest[i];
