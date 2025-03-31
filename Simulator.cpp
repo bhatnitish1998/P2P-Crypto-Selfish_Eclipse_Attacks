@@ -148,14 +148,14 @@ void Simulator::start()
 void Simulator::write_node_stats_to_file()
 {
     // Check if the directory exists, if not create it
-    if (fs::path dir = "Output/Node_Files"; !fs::exists(dir))
+    if (fs::path dir = output_dir + "/Node_Files"; !fs::exists(dir))
         fs::create_directories(dir);
 
 
     ofstream file;
     for (int i = 0; i < number_of_nodes; i++)
     {
-        string filepath = "Output/Node_Files/Node_" + std::to_string(i) + ".txt";
+        string filepath = output_dir + "/Node_Files/Node_" + std::to_string(i) + ".txt";
         file.open(filepath);
 
         if (!file)
@@ -293,13 +293,13 @@ void Simulator::write_node_stats_to_file()
 
 void Simulator::write_all_node_details_to_file(const vector<Node>& nodes, const std::string &fname)
 {
-    fs::path dir = "Output/Temp_files/";
+    fs::path dir = output_dir + "/Temp_files/";
 
     if (!fs::exists(dir)) {
         fs::create_directories(dir);
     }
 
-    std::string filepath = "Output/Temp_files/" + fname;
+    std::string filepath = output_dir + "/Temp_files/" + fname;
     std::ofstream file(filepath);
 
     if (!file) {

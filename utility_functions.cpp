@@ -160,14 +160,14 @@ bool check_connected_map(map<int, vector<int>>& al) {
 void write_network_to_file(vector<vector<int>> &al,const string &fname)
 {
     // directory name to store file
-    fs::path dir = "Output/Temp_files/";
+    fs::path dir = output_dir + "/Temp_files/";
 
     // Check if the directory exists, if not create it
     if (!fs::exists(dir)) {
         fs::create_directories(dir);
     }
 
-    string filepath = "Output/Temp_files/" + fname;
+    string filepath = output_dir + "/Temp_files/" + fname;
 
     ofstream file(filepath);
 
@@ -192,13 +192,13 @@ void write_network_to_file(vector<vector<int>> &al,const string &fname)
 void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
 {
     // directory name to store file
-    fs::path dir = "Output/Temp_files/";
+    fs::path dir = output_dir + "/Temp_files/";
 
     if (!fs::exists(dir)) {
         fs::create_directories(dir);
     }
 
-    string filepath = "Output/Temp_files/" + fname;
+    string filepath = output_dir + "/Temp_files/" + fname;
     ofstream file(filepath);
     if(!file){
         cerr << "An Error occurred while opening file!" << endl;
@@ -239,19 +239,19 @@ void write_network_to_file_map(map<int, vector<int>>& al,const string &fname)
 }
 
 //  Hash computation taken from MICA key-value store by Hyeontaek Lim
-string md5(const string &data) {
-    unsigned char digest[EVP_MAX_MD_SIZE];
-    unsigned int digest_len;
+// string md5(const string &data) {
+//     unsigned char digest[EVP_MAX_MD_SIZE];
+//     unsigned int digest_len;
     
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(ctx, EVP_md5(), nullptr);
-    EVP_DigestUpdate(ctx, data.c_str(), data.size());
-    EVP_DigestFinal_ex(ctx, digest, &digest_len);
-    EVP_MD_CTX_free(ctx);
+//     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+//     EVP_DigestInit_ex(ctx, EVP_md5(), nullptr);
+//     EVP_DigestUpdate(ctx, data.c_str(), data.size());
+//     EVP_DigestFinal_ex(ctx, digest, &digest_len);
+//     EVP_MD_CTX_free(ctx);
     
-    stringstream ss;
-    for (unsigned int i = 0; i < digest_len; i++) {
-        ss << hex << setw(2) << setfill('0') << (int)digest[i];
-    }
-    return ss.str();
-}
+//     stringstream ss;
+//     for (unsigned int i = 0; i < digest_len; i++) {
+//         ss << hex << setw(2) << setfill('0') << (int)digest[i];
+//     }
+//     return ss.str();
+// }

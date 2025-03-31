@@ -40,6 +40,7 @@ extern bool eclipse_attack;
 extern bool selfish_mining;
 extern int maximum_retries;
 extern int global_send_private_counter;
+extern string output_dir;
 
 // Link between two nodes
 class Link
@@ -149,9 +150,12 @@ class Logger
 {
 public:
   ofstream log;
+  string output_dir;
 
   Logger();
   ~Logger();
+
+  void setOutputDir(const std::string& dir); 
 };
 
 extern Logger l;

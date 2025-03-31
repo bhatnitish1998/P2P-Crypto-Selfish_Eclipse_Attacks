@@ -759,14 +759,66 @@ Network::Network()
 
 }
 
-Logger::Logger()
+// Logger::Logger()
+// {
+//     if (fs::path dir = output_dir +"/Log"; !fs::exists(dir))
+//         fs::create_directories(dir);
+//     log.open(output_dir + "/Log/log.txt");
+// }
+
+// Logger::~Logger()
+// {
+//     log.close();
+// }
+
+// void Logger::setOutputDir(const std::string& dir)
+// {
+//     output_dir = dir;
+
+//     if (fs::path log_dir = output_dir + "/Log"; !fs::exists(log_dir))
+//     {
+//         fs::create_directories(log_dir);
+//     }
+
+//     log.open(output_dir + "/Log/log.txt", std::ios::out);
+
+//     if (!log.is_open())
+//     {
+//         std::cerr << "Error: Unable to open log file at " << output_dir + "/Log/log.txt" << std::endl;
+//         exit(1);
+//     }
+// }
+
+Logger::Logger() 
 {
-    if (fs::path dir = "Output/Log"; !fs::exists(dir))
-        fs::create_directories(dir);
-    log.open("Output/Log/log.txt");
+    // constructor should not attempt to open the log file.
+    // Log initialization will be deferred to the setOutputDir method.
 }
 
 Logger::~Logger()
 {
-    log.close();
+    if (log.is_open())
+    {
+        log.close();
+    }
+}
+
+void Logger::setOutputDir(const std::string& dir)
+{
+    output_dir = dir;
+
+    // Create the directory if it doesn't already exist
+    if (fs::path log_dir = output_dir + "/Log"; !fs::exists(log_dir))
+    {
+        fs::create_directories(log_dir);
+    }
+
+    // Open the log file in the specified directory
+    log.open(output_dir + "/Log/log.txt", std::ios::out);
+
+    if (!log.is_open())
+    {
+        std::cerr << "Error: Unable to open log file at " << output_dir + "/Log/log.txt" << std::endl;
+        exit(1);
+    }
 }

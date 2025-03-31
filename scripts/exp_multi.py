@@ -6,9 +6,9 @@ import time
 import shutil
 import subprocess
 import itertools
+import threading
 from tqdm import tqdm
 import math
-
 
 def parse_node_file(file_path):
     """Parses the node log file and extracts relevant blockchain statistics."""
@@ -49,25 +49,55 @@ def get_ringmaster_node(node_properties_filepath):
     print("Error: No ringmaster node found!")
     return None
 
-def main():
-    """ Run as: python scripts/exp.py and relax!"""
-
-    """------------------- Set params here ------------------------"""
-    # Define parameter ranges
-    number_of_nodes_list                = [50]
-    percent_malicious_list              = [40,60]  
-    mean_transaction_inter_arrival_list = [50]
-    block_inter_arrival_list            = [600]
-    timeout_time_list                   = [1000,3000]
-    eclipse_attack_list                 = [False]
-    """--------------------------------------------------------------"""
-
+def run_experiment(params, results_file_path, experiment_subfolder):
+    eclipse_attack, number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout = params
     project_root = os.getcwd()
-    output_folder = os.path.join(project_root, "Output")
+    exp_id = f"{eclipse_attack}_{number_of_nodes}_{percent_malicious}_{mean_tx_time}_{block_time}_{timeout}"
+    output_dir_name = f"Output_{exp_id}"
+    output_folder = os.path.join(experiment_subfolder, output_dir_name)
+    os.makedirs(output_folder, exist_ok=True)
+    # temp_folder = os.path.join(experiment_subfolder, f"temp_{percent_malicious}_{timeout}_{eclipse_attack}")
+    # os.makedirs(temp_folder, exist_ok=True)
+    
+    main_executable = os.path.join(project_root, "main.exe" if os.name == 'nt' else "main")
+    cmd = [main_executable, str(number_of_nodes), str(percent_malicious), str(mean_tx_time), str(block_time), str(timeout), output_folder]
+    if eclipse_attack:
+        cmd.append("--eclipse")
+    print(f"\nExecuting: {' '.join(cmd)}")
+    process = subprocess.run(cmd, capture_output=True, text=True)
+    
+    time.sleep(3)
+    
     node_properties_filepath = os.path.join(output_folder, "Temp_files", "all_node_details.csv")
     input_folder = os.path.join(output_folder, "Node_Files")
+    ringmaster_node = get_ringmaster_node(node_properties_filepath)
+    if ringmaster_node is None:
+        return
     
-    # Experiment folder setup
+    input_file = os.path.join(input_folder, f"Node_{ringmaster_node}.txt")
+    if os.path.exists(input_file):
+        node_data = parse_node_file(input_file)
+        ratio_1, ratio_2 = compute_ratios(node_data)
+    else:
+        ratio_1, ratio_2 = 'Nan', 'Nan'
+    
+    with open(results_file_path, "a", newline='') as results_file:
+        writer = csv.writer(results_file)
+        writer.writerow([number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout, eclipse_attack, round(ratio_1, 4), round(ratio_2, 4)])
+
+def main():
+    """ Run as: python scripts/exp.py and relax!"""
+    
+    """------------------- Set params here ------------------------"""
+    number_of_nodes_list = [10]
+    percent_malicious_list = [50, 60]  
+    mean_transaction_inter_arrival_list = [1000]
+    block_inter_arrival_list = [100]
+    timeout_time_list = [500, 1500]
+    eclipse_attack_list = [False, True]
+    """--------------------------------------------------------------"""
+    
+    project_root = os.getcwd()
     experiment_root = os.path.join(project_root, "experiments")
     os.makedirs(experiment_root, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -76,12 +106,11 @@ def main():
     
     results_file_path = os.path.join(experiment_subfolder, "results.csv")
     
-    # Write CSV header
     with open(results_file_path, "w", newline='') as results_file:
         writer = csv.writer(results_file)
         writer.writerow(["number_of_nodes", "percent_malicious", "mean_transaction_inter_arrival", "block_inter_arrival", "timeout", "is_eclipse", "ratio_1", "ratio_2"])
     
-        combinations_param_list = [
+    combinations_param_list = [
         eclipse_attack_list,
         number_of_nodes_list,
         percent_malicious_list,
@@ -89,60 +118,24 @@ def main():
         block_inter_arrival_list,
         timeout_time_list,
     ]
-        
+    
     total_combinations = math.prod(map(len, combinations_param_list))
-
-    exp_params = itertools.product(*combinations_param_list)
-
+    exp_params = list(itertools.product(*combinations_param_list))
     print(f"\nTotal no. of experiments: {total_combinations}\n")
-
+    
+    threads = []
     for params in tqdm(exp_params, desc="Running experiments", unit="experiment", total=total_combinations):
-        
-        eclipse_attack, number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout = params
-        
-        # Delete Output and Temp folder
-        if os.path.exists(output_folder):
-            shutil.rmtree(output_folder)
-        temp_folder = os.path.join(project_root, "Temp_files")
-        if os.path.exists(temp_folder):
-            shutil.rmtree(temp_folder)
-        # print("\nOld Output and temp folder deleted")
-
-        # Run main executable
-        main_executable = os.path.join(project_root, "main.exe" if os.name == 'nt' else "main")
-        cmd = [main_executable, str(number_of_nodes), str(percent_malicious), str(mean_tx_time), str(block_time), str(timeout)]
-        if eclipse_attack:
-            cmd.append("--eclipse")
-        # cmd.append(f" > {experiment_subfolder}/exp_stdout.log")
-        # print(f"\nExecuting: {' '.join(cmd)}")
-        process = subprocess.run(cmd, capture_output=True, text=True)
-        # print("stdout:\n", process.stdout)
-        # print("stderr:\n", process.stderr)
-        
-        time.sleep(10)
-
-        # Parse results
-        ringmaster_node = get_ringmaster_node(node_properties_filepath)
-        if ringmaster_node is None:
-            continue
-        
-
-        input_file = os.path.join(input_folder, f"Node_{ringmaster_node}.txt")
-        if os.path.exists(input_file):
-            node_data = parse_node_file(input_file)
-            ratio_1, ratio_2 = compute_ratios(node_data)
-        else:
-            ratio_1, ratio_2 = 'Nan', 'Nan'
-        
-        # Save results to CSV
-        with open(results_file_path, "a", newline='') as results_file:
-            writer = csv.writer(results_file)
-            writer.writerow([number_of_nodes, percent_malicious, mean_tx_time, block_time, timeout, eclipse_attack, round(ratio_1, 4), round(ratio_2, 4)])
+        thread = threading.Thread(target=run_experiment, args=(params, results_file_path, experiment_subfolder))
+        thread.start()
+        threads.append(thread)
+    
+    for thread in threads:
+        thread.join()
     
     print(f"Results saved to {results_file_path}")
-
+    
     plot_script = os.path.join(os.getcwd(), "scripts", "plot.py")
     subprocess.run(['python3', plot_script, results_file_path])
-    
+
 if __name__ == "__main__":
     main()

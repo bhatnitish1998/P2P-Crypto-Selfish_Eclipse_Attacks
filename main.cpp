@@ -30,6 +30,7 @@ int percent_malicious_nodes;
 int mean_transaction_inter_arrival_time;
 int block_inter_arrival_time;
 int timer_timeout_time;
+string output_dir = "Output";
 
 // Simulation variables
 long long simulation_time = 0;
@@ -43,14 +44,15 @@ int global_send_private_counter =0;
 
 int main(int argc, char* argv[])
 {
-    if (argc < 6 || argc > 7)
+    if (argc < 7 || argc > 8)
     {
         cerr << "Usage: " << argv[0] <<
-            " <number_of_nodes> <percent_malicious> <mean_transaction_inter_arrival_time> <block_inter_arrival_time> <timeout time>"
+            " <number_of_nodes> <percent_malicious> <mean_transaction_inter_arrival_time> <block_inter_arrival_time> <timeout time> <output_dir> [--eclipse]" 
             << endl;
         cerr << "  mean_transaction_inter_arrival_time: milli-seconds" << endl;
         cerr << "  block_inter_arrival_time: seconds" << endl;
         cerr << "  timeout time: milli-seconds" << endl;
+        cerr << "  output_dir" << endl;
         cerr << "  [--eclipse]: optional argument to enable eclipse attack" << endl;
         return 1;
     }
@@ -60,8 +62,11 @@ int main(int argc, char* argv[])
     mean_transaction_inter_arrival_time = stoi(argv[3]);
     block_inter_arrival_time = stoi(argv[4])* 1000 ;
     timer_timeout_time = stoi(argv[5]);
+    output_dir = argv[6];
 
-    if (argc == 7 && string(argv[6]) == "--eclipse")
+    l.setOutputDir(output_dir);
+
+    if (argc == 8 && string(argv[7]) == "--eclipse")
         eclipse_attack = true;
 
     if (number_of_nodes < 1 ||  percent_malicious_nodes < 0 || percent_malicious_nodes > 100
@@ -94,6 +99,7 @@ int main(int argc, char* argv[])
         " bitcoins" << endl;
     cout << "  Eclipse Attack: " << (eclipse_attack ? "Enabled" : "Disabled") << endl;
     cout << "  Selfish Mining: " << (selfish_mining ? "Enabled" : "Disabled") << endl;
+    cout << "  Output Directory: " << output_dir << endl;
     cout << "----------------------------------------------------------------------" << endl;
     srand(global_seed);
 

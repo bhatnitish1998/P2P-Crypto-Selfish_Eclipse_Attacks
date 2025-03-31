@@ -11,6 +11,8 @@ using namespace std;
 namespace fs = filesystem;
 
 extern unsigned int global_seed;
+extern string output_dir;
+
 
 // min and max are inclusive
 int uniform_distribution(int min, int max);
@@ -37,6 +39,6 @@ void write_network_to_file(vector<vector<int>>& al,const string& fname);
 void write_network_to_file_map(map<int, vector<int>>& al,const string &fname);
 
 //  Hash computation taken from MICA key-value store by Hyeontaek Lim
-string md5(const string &data);
+// string md5(const string &data);
 
 #endif //UTILITY_H
