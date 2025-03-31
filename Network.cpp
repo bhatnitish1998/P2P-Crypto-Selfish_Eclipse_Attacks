@@ -9,6 +9,7 @@ Link::Link(const int peer, const int propagation_delay, const long long link_spe
     this->peer = peer;
     this->propagation_delay = propagation_delay;
     this->link_speed = link_speed;
+    this->failed =0;
 }
 
 Node::Node()
@@ -128,6 +129,7 @@ void Node::receive_hash(const receive_hash_object &obj)
 
         // Add timer
         Timer t(obj.blk,true);
+        t.current_sender = obj.sender_node_id;
         t.tried_senders.insert(obj.sender_node_id);
         timers.emplace(obj.blk->id,t);
 
@@ -160,6 +162,40 @@ void Node::timer_expired(const timer_expired_object& obj)
         it->second.is_running = false;
         return;
     }
+
+    Link to_punish_link(1,1,1);
+
+    for (auto link : peers)
+    {
+        if (link.peer == it->second.current_sender)
+        {
+            link.failed++;
+            to_punish_link = link;
+            break;
+        }
+    }
+
+    if (to_punish_link.failed > 10 && mitigation)
+    {
+        // Remove the link from peers if failed count exceeds 10.
+        peers.erase(
+            std::remove_if(peers.begin(), peers.end(), [&](const auto& link) {
+                return link.peer == it->second.current_sender;
+            }),
+            peers.end());
+
+
+        // Add random peer
+        Network& network = Network::getInstance();
+        int new_node = choose_neighbours_values(network.honest_node_ids,1 , {id})[0];
+
+        int link_speed = network.nodes[id].fast && network.nodes[new_node].fast ? 100 * 1000 : 5 * 1000; // bits per millisecond
+
+        int propagation_delay = uniform_distribution(propagation_delay_min,propagation_delay_max);
+        network.nodes[id].peers.emplace_back(new_node, propagation_delay, link_speed);
+        network.nodes[new_node].peers.emplace_back(id, propagation_delay, link_speed);
+    }
+
 
     // send to the next available
     int next_sender = it->second.available_senders.front();

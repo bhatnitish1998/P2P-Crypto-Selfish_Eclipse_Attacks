@@ -41,6 +41,7 @@ extern bool selfish_mining;
 extern int maximum_retries;
 extern int global_send_private_counter;
 extern string output_dir;
+extern bool mitigation;
 
 // Link between two nodes
 class Link
@@ -49,6 +50,7 @@ public:
   int peer; // peer node id
   int propagation_delay;
   long long link_speed;
+  long long failed;
 
   // keeps track of transactions and blocks sent to avoid loops
   set<long long> transactions_sent;

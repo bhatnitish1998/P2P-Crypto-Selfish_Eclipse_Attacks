@@ -65,6 +65,7 @@ class Timer {
     queue<int> available_senders;
     set<int> tried_senders;
     bool is_running;
+    int current_sender;
 
     Timer(shared_ptr<Block> blk, bool is_runninng);
 };
