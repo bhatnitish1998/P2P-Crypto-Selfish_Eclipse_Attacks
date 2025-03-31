@@ -14,6 +14,7 @@ args = parser.parse_args()
 csv_dir = os.path.dirname(args.csv_file_path)
 
 data = pd.read_csv(args.csv_file_path)
+data = data.sort_values(by=['percent_malicious', 'timeout'])
 
 # Get unique values for is_eclipse
 is_eclipse_values = data['is_eclipse'].unique()
