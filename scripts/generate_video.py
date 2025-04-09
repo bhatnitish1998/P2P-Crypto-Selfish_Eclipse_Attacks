@@ -5,15 +5,22 @@ import glob
 import matplotlib.patches as mpatches
 import matplotlib.animation as animation
 from collections import defaultdict, deque
+import argparse 
 
-def initialize_path():
+# def initialize_path():
+#     script_dir = os.path.dirname(os.path.abspath(__file__))
+#     project_root = os.path.dirname(script_dir)
+
+#     input_folder = os.path.join(project_root, "Output/Node_Files")
+#     input_files = glob.glob(os.path.join(input_folder, "Node_0.txt"))
+#     output_folder = os.path.join(project_root, "Output/Blockchains")
+#     return input_files, output_folder
+
+def initialize_path(input_filepath):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-
-    input_folder = os.path.join(project_root, "Output/Node_Files")
-    input_files = glob.glob(os.path.join(input_folder, "Node_0.txt"))
     output_folder = os.path.join(project_root, "Output/Blockchains")
-    return input_files, output_folder
+    return input_filepath, output_folder
 
 def load_blockchain_graph_from_file(filepath):
     edges = []
@@ -82,10 +89,8 @@ def animate_blockchain(edges, node_mining_data, output_folder, output_filename):
     fig, ax = plt.subplots(figsize=(40, 8))
     ax.set_facecolor('black')
     
-    # Remove padding around the figure
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-    # Remove extra margins from the figure
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
@@ -171,7 +176,6 @@ def animate_blockchain(edges, node_mining_data, output_folder, output_filename):
         repeat=False,
     )
 
-    # Ensure tight layout before saving
     plt.tight_layout(pad=0)
 
     os.makedirs(output_folder, exist_ok=True)
@@ -180,9 +184,23 @@ def animate_blockchain(edges, node_mining_data, output_folder, output_filename):
     plt.close()
     print(f"Saved animation: {video_path}")
 
+# if __name__ == "__main__":
+#     input_files, output_folder = initialize_path()
+#     for input_filepath in input_files:
+#         edges, node_mining_data = load_blockchain_graph_from_file(input_filepath)
+#         output_filename = os.path.basename(input_filepath)
+#         animate_blockchain(edges, node_mining_data, output_folder, output_filename)
+
 if __name__ == "__main__":
-    input_files, output_folder = initialize_path()
-    for input_filepath in input_files:
-        edges, node_mining_data = load_blockchain_graph_from_file(input_filepath)
-        output_filename = os.path.basename(input_filepath)
-        animate_blockchain(edges, node_mining_data, output_folder, output_filename)
+    parser = argparse.ArgumentParser(description='Generate blockchain visualization video')
+    parser.add_argument('input_file', type=str, help='Path to the Node.txt file')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.input_file):
+        print(f"Error: Input file '{args.input_file}' does not exist")
+        exit(1)
+
+    input_filepath, output_folder = initialize_path(args.input_file)
+    edges, node_mining_data = load_blockchain_graph_from_file(input_filepath)
+    output_filename = os.path.basename(input_filepath)
+    animate_blockchain(edges, node_mining_data, output_folder, output_filename)
