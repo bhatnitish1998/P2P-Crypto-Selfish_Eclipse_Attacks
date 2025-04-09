@@ -109,12 +109,24 @@ def plot_blockchain_graph(graph, node_colors, directory, output_filename):
 
     os.makedirs(directory, exist_ok=True)
     output_file = os.path.join(directory, output_filename)
-    plt.savefig(output_file, format='png', facecolor='black', dpi=100)
+    plt.savefig(output_file, format='png', facecolor='black', dpi=75)
     plt.close()
 
 if __name__ == "__main__":
     input_files, output_folder = initialize_path()
+    import pandas as pd
+    df = pd.read_csv("Output/Temp_files/all_node_details.csv")
+    # rm = df[df['ringmaster'] == 1]['node_id'].values[0]  # Get the ringmaster node ID
+    rm = df[df['ringmaster'] == 1]['node_id'].values[0]  # Get the ringmaster node ID
+
+    
+    print("Ringmaster: ", rm)
+    # print(rm)
     for idx, input_filepath in enumerate(input_files):
+        node_id = int(os.path.basename(input_filepath).split('_')[1].split('.')[0])  # Extract node ID from filename
+        if node_id != rm:  # Compare with actual node ID, not enumerate index
+            continue
+
         output_filename = os.path.splitext(os.path.basename(input_filepath))[0] + ".png"
         blockchain_graph, node_mining_data = load_blockchain_graph_from_file(input_filepath)
 
@@ -129,3 +141,4 @@ if __name__ == "__main__":
         if idx == 0:
             print("Created Blockchain: ", end=" ", flush=True)
         print(output_filename, end=" ", flush=True)
+    os.system(f"code {output_folder}/{output_filename}")
