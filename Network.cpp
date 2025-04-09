@@ -75,6 +75,17 @@ void Node::receive_transaction(const receive_transaction_object& obj)
     // if free start mining
     if (!currently_mining) mine_block();
 
+    if (malicious)
+    {
+        for (Link& x : malicious_peers)
+        {
+            if (x.peer != obj.sender_node_id && x.transactions_sent.count(obj.txn->id) == 0)
+            {
+                send_transaction_to_link(obj.txn, x);
+            }
+        }
+    }
+
     // send it to the first unsent peer
     for (Link& x : peers)
     {
@@ -165,7 +176,7 @@ void Node::timer_expired(const timer_expired_object& obj)
 
     Link to_punish_link(1,1,1);
 
-    for (auto link : peers)
+    for (auto &link : peers)
     {
         if (link.peer == it->second.current_sender)
         {
@@ -175,7 +186,7 @@ void Node::timer_expired(const timer_expired_object& obj)
         }
     }
 
-    if (to_punish_link.failed > 10 && mitigation)
+    if (to_punish_link.failed > 3 && mitigation)
     {
         // Remove the link from peers if failed count exceeds 10.
         peers.erase(
